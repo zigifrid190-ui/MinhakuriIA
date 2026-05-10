@@ -47,3 +47,15 @@ desktop.ini
 # (Mantemos as regras, mas evitamos lixo temporário)
 .agent/scratch/
 .agent/logs/
+designer/
+
+# Future-proofing (patterns comuns de builds e configs)
+*.log
+.env.*
+!.env.example
+dist/
+build/
+out/
+.next/
+.cache/
+node_modules/
