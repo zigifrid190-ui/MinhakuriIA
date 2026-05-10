@@ -1,0 +1,24 @@
+# Core
+httpx
+python-dotenv
+
+# LLM / Brain
+# (httpx already covers API calls)
+
+# Speech-to-Text (local)
+faster-whisper
+sounddevice
+numpy
+
+# Text-to-Speech
+edge-tts
+pygame
+
+# System Automation
+psutil
+pyautogui
+
+# Desktop Widget (GUI)
+PyQt6
+PyQt6-Qt6
+PyQt6-sip

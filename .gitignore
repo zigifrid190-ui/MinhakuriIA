@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv
+venv/
+ENV/
+
+# Environment Variables
+.env
+
+# Kuri Specific (Arquivos de Persistência Local)
+kuri_memoria.json
+kuri_perfil.json
+kuri_resposta.mp3
+kuri_log.txt
+*.mp3
+*.wav
+
+# IDEs
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Agent & Design System Kit
+# (Mantemos as regras, mas evitamos lixo temporário)
+.agent/scratch/
+.agent/logs/
