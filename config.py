@@ -13,13 +13,13 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 # ===== LLM =====
 GROK_MODEL = "grok-4"
 GROK_TEMPERATURE = 0.88
-GROK_MAX_TOKENS = 450
+GROK_MAX_TOKENS = 200
 GROK_URL = "https://api.x.ai/v1/chat/completions"
 
 # ===== TTS =====
 EDGE_TTS_VOICE = "pt-BR-FranciscaNeural"
 TTS_OUTPUT_FILE = "kuri_resposta.mp3"
-USE_PREMIUM_TTS = False  # True = ElevenLabs, False = edge-tts (gratuito)
+USE_PREMIUM_TTS = os.getenv("USE_PREMIUM_TTS", "false").lower() == "true"
 
 # ===== STT =====
 WHISPER_MODEL = "base"        # tiny, base, small, medium, large-v3

@@ -68,7 +68,7 @@ async def pensar(texto: str) -> dict:
     historico = carregar_historico()
     messages = _build_messages(texto, historico)
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.post(
                 GROK_URL,
@@ -84,6 +84,51 @@ async def pensar(texto: str) -> dict:
             )
             response.raise_for_status()
             data = response.json()
+            
+            choice = data["choices"][0]
+            message = choice["message"]
+            acao_executada = None
+
+            # Verifica se a Kuri quer executar uma ferramenta
+            if message.get("tool_calls"):
+                tool_call = message["tool_calls"][0]
+                func_name = tool_call["function"]["name"]
+                func_args = json.loads(tool_call["function"]["arguments"])
+
+                print(f"[TOOL] Kuri quer executar: {func_name}({func_args})")
+
+                if func_name in REGISTRY:
+                    acao_executada = REGISTRY[func_name](**func_args)
+                    print(f"[OK] Resultado: {acao_executada}")
+
+                    # Segunda chamada: Kuri comenta sobre a ação executada
+                    messages.append(message)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": acao_executada
+                    })
+
+                    try:
+                        follow_up = await client.post(
+                            GROK_URL,
+                            headers={"Authorization": f"Bearer {GROK_API_KEY}"},
+                            json={
+                                "model": GROK_MODEL,
+                                "messages": messages,
+                                "temperature": GROK_TEMPERATURE,
+                                "max_tokens": 150 # Resposta de ação bem curta
+                            }
+                        )
+                        follow_up.raise_for_status()
+                        resposta = follow_up.json()["choices"][0]["message"]["content"]
+                    except Exception:
+                        resposta = acao_executada
+                else:
+                    resposta = f"Não sei executar a ação '{func_name}' ainda."
+            else:
+                resposta = message.get("content", "...")
+
         except httpx.HTTPStatusError as e:
             print(f"[ERRO] HTTP do Grok: {e.response.status_code} - {e.response.text[:200]}")
             return {"resposta": "Meu cérebro deu tela azul, velho. Tenta de novo.", "acao_executada": None}
@@ -93,50 +138,6 @@ async def pensar(texto: str) -> dict:
         except Exception as e:
             print(f"[ERRO] Inesperado no brain: {e}")
             return {"resposta": "Deu ruim aqui. Erro genérico, manda de novo.", "acao_executada": None}
-
-    choice = data["choices"][0]
-    message = choice["message"]
-    acao_executada = None
-
-    # Verifica se a Kuri quer executar uma ferramenta
-    if message.get("tool_calls"):
-        tool_call = message["tool_calls"][0]
-        func_name = tool_call["function"]["name"]
-        func_args = json.loads(tool_call["function"]["arguments"])
-
-        print(f"[TOOL] Kuri quer executar: {func_name}({func_args})")
-
-        if func_name in REGISTRY:
-            acao_executada = REGISTRY[func_name](**func_args)
-            print(f"[OK] Resultado: {acao_executada}")
-
-            # Segunda chamada: Kuri comenta sobre a ação executada
-            messages.append(message)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tool_call["id"],
-                "content": acao_executada
-            })
-
-            try:
-                follow_up = await client.post(
-                    GROK_URL,
-                    headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                    json={
-                        "model": GROK_MODEL,
-                        "messages": messages,
-                        "temperature": GROK_TEMPERATURE,
-                        "max_tokens": 200
-                    }
-                )
-                follow_up.raise_for_status()
-                resposta = follow_up.json()["choices"][0]["message"]["content"]
-            except Exception:
-                resposta = acao_executada
-        else:
-            resposta = f"Não sei executar a ação '{func_name}' ainda."
-    else:
-        resposta = message.get("content", "...")
 
     import re
     emocao = "neutral"

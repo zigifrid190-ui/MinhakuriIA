@@ -1,10 +1,10 @@
 {
-  "input_device": null,
+  "input_device": 1,
   "output_device": null,
   "volume": 80,
-  "use_premium_tts": false,
+  "use_premium_tts": true,
   "widget_pos": [
-    39,
-    632
+    295,
+    623
   ]
 }

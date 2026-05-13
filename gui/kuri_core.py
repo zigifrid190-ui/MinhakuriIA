@@ -98,11 +98,16 @@ async def _kuri_voice_loop():
             bridge.set_state(KuriState.SPEAKING)
             bridge.set_emotion(emocao)
             bridge.emit_text(resposta)
-            await falar(resposta)
+            
+            # Carrega config da GUI para ver se deve usar premium
+            config = load_gui_config()
+            usar_premium = config.get("use_premium_tts", False)
+            
+            await falar(resposta, premium=usar_premium)
 
         bridge.set_state(KuriState.IDLE)
         bridge.set_emotion("neutral")
-        await asyncio.sleep(0.05)
+        # Removido sleep para resposta imediata
 
 
 def start_core_thread():

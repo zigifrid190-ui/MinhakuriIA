@@ -1,66 +1,86 @@
-# 🤖 Kuri IA - Seu Assistente Desktop Pessoal
+# 🤖 Kuri IA — Seu Assistente Desktop Pessoal (Jarvis Mode)
 
-![Kuri Header](https://img.shields.io/badge/Status-Desenvolvimento_Ativo-green?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-v0.5_Desktop_Assistant-green?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6-darkblue?style=for-the-badge)
+![Privacidade](https://img.shields.io/badge/Privacidade-Local__First-orange?style=for-the-badge)
 
-A **Kuri** é um assistente virtual autônomo projetado para viver diretamente no seu desktop. Inspirada na ideia de um "Jarvis pessoal", ela combina inteligência artificial avançada com uma interface visual minimalista e funcional (Widget), permitindo interações naturais por voz enquanto executa tarefas no seu computador.
-
----
-
-## 🌟 Inspiração e Visão
-O projeto nasceu do desejo de tirar a IA de dentro do navegador e trazê-la para o ambiente onde o trabalho real acontece: o sistema operacional. 
-
-As principais inspirações foram:
-- **J.A.R.V.I.S. (Homem de Ferro):** A ideia de um assistente onipresente que entende o contexto do seu computador.
-- **Mascotes Virtuais:** Trazer uma identidade visual (avatar animado) para criar uma conexão mais humana e menos "robótica".
-- **Automação Pragmática:** Uma ferramenta que não apenas conversa, mas que *faz* coisas (abrir apps, controlar volume, gerenciar arquivos).
+A **Kuri** é uma assistente virtual autônoma projetada para viver diretamente no seu desktop Windows. Inspirada na filosofia de um "Jarvis pessoal com alma", ela combina inteligência artificial avançada (Grok/Ollama) com uma interface visual viva (Gamer HUD minimalista), permitindo interações rápidas por voz enquanto executa tarefas de forma integrada no seu sistema operacional.
 
 ---
 
-## 🚀 O Processo de Criação
-A Kuri evoluiu de um simples bot de API para uma aplicação desktop robusta:
+## 🌟 O que a Kuri faz hoje (v0.5)
 
-1.  **Core de Voz:** Implementamos um loop de voz-para-voz usando `faster-whisper` (STT local) para privacidade e velocidade, e `edge-tts` para vozes naturais e leves.
-2.  **O Cérebro (Brain):** Integrada ao Grok (xAI) para uma personalidade sarcástica, brasileira e eficiente, capaz de decidir quando usar ferramentas do sistema.
-3.  **Interface (HUD):** Desenvolvida em **PyQt6**, a interface foi desenhada no estilo "Gamer HUD", sendo pequena, arrastável e "always-on-top".
-4.  **Integração Visual:** Criamos um sistema de estados emocionais que mapeia a resposta do LLM para animações específicas do avatar em tempo real.
+A Kuri evoluiu de um simples chatbot para uma aplicação desktop nativa ultrarrápida:
+
+- **🎙️ Ciclo de Voz Otimizado:** Transcrição instantânea via `faster-whisper` (local-first com filtro VAD e detecção de silêncio de 1.0s) garantindo que seus dados de áudio não sejam enviados para a nuvem.
+- **🔊 Voz Premium com Cache:** Integração nativa com a voz profissional da **ElevenLabs** (com sistema de cache local em `tts_cache/` para economizar créditos) e fallback automático para `edge-tts` gratuito.
+- **🧠 Cérebro Inteligente (Brain):** Conectada ao Grok-4 (xAI) com **Function Calling**, permitindo à Kuri decidir autonomamente quando conversar ou quando executar comandos no seu PC.
+- **🖥️ Controle do Sistema:** Possui 8 ações nativas cadastradas para abrir/fechar apps, fazer pesquisas na web, consultar hora/data, criar/abrir pastas do sistema, tirar prints e controlar o volume do Windows em tempo real.
+- **✨ Interface Viva (Gamer HUD):** Janela flutuante desenvolvida em **PyQt6** (260x320, sem bordas, always-on-top e arrastável) com um sistema de avatares em vídeo MP4 em loop nativo que reagem dinamicamente a 5 estados emocionais mapeados pelo LLM (`neutral`, `cool`, `surprised`, `blushing`, `angry`).
 
 ---
 
-## 🛠️ Como Usar
+## 🚀 Como Usar
 
 ### Pré-requisitos
-- Python 3.10 ou superior.
-- Microfone e Saída de Áudio configurados.
+- Windows 10/11
+- Python 3.10 ou superior
+- Microfone e alto-falantes configurados
 
-### Instalação (Desenvolvimento)
-1.  Clone o repositório.
-2.  Crie um ambiente virtual: `python -m venv venv`.
-3.  Instale as dependências: `pip install -r requirements.txt`.
-4.  Configure seu arquivo `.env` com as chaves necessárias (Grok API).
-5.  Execute: `python kuri_desktop.py`.
+### Instalação (Modo Desenvolvimento)
+1. Clone este repositório:
+   ```bash
+   git clone https://github.com/teu-usuario/MinhakuriIA.git
+   cd MinhakuriIA
+   ```
+2. Crie e ative o ambiente virtual:
+   ```bash
+   python -m venv venv
+   .\venv\Scripts\activate
+   ```
+3. Instale as dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Crie um arquivo `.env` na raiz baseado no exemplo e insira suas credenciais:
+   ```env
+   GROK_API_KEY=sua_chave_grok
+   ELEVENLABS_API_KEY=sua_chave_elevenlabs
+   ELEVENLABS_VOICE_ID=id_da_voz_escolhida
+   USE_PREMIUM_TTS=true
+   ```
+5. Inicie a assistente:
+   ```bash
+   python kuri_desktop.py
+   ```
 
-### Usando o Executável
-Se você compilou o projeto usando o PyInstaller:
-1.  Vá até `dist/KuriIA/`.
-2.  Execute o `KuriIA.exe`.
-3.  Ajuste as configurações de áudio no ícone de engrenagem ⚙️ no widget.
+### Usando o Executável Compilado (.exe)
+1. Acesse a pasta `dist/KuriIA/`.
+2. Execute `KuriIA.exe`.
+3. Clique no ícone de engrenagem ⚙️ na barra inferior do widget para configurar seus dispositivos de entrada/saída de áudio, ajustar volume ou alternar entre o TTS Premium e Gratuito.
 
 ---
 
-## 🔮 Próximos Passos (Roadmap)
-A Kuri está em constante evolução. Os planos futuros incluem:
+## 🗺️ Roadmap de Evolução (v2.0+)
 
-- [ ] **Área de Trabalho Remota:** Capacidade de visualizar e interagir com o desktop remotamente via comandos de voz.
-- [ ] **Visão Computacional:** Permitir que a Kuri "veja" o que está na sua tela para ajudar em tarefas visuais ou depuração de código.
-- [ ] **Memória de Longo Prazo:** Um sistema de banco de dados vetorial para ela lembrar de fatos complexos por meses.
-- [ ] **Integração com Casa Inteligente:** Controlar luzes e dispositivos IoT diretamente pelo widget.
+O desenvolvimento da Kuri segue uma filosofia inspirada na arquitetura **PAI (Personal AI Infrastructure)** de Daniel Miessler, focando em transformá-la em um verdadeiro sistema operacional pessoal inteligente. 
+
+Para ver todos os detalhes técnicos, tarefas e checklists de cada etapa, consulte nosso documento oficial: **[KURI_ROADMAP.md](./KURI_ROADMAP.md)**.
+
+### Resumo dos Sprints:
+- **Sprint 1 (Atual): Performance e Voz** — Concluída a integração com ElevenLabs, cache local, otimização de latência do Whisper e responsividade da GUI. *(Pendente otimização de consumo de RAM/CPU para hardware modesto).*
+- **Sprint 2: Inteligência e Memória** — Migração da memória JSON para **SQLite** com resumos automáticos de contexto, busca semântica, calibração automática de microfone e suporte nativo ao Python 3.12+.
+- **Sprint 3: Visual Premium e Rotinas** — Redesign da interface (300x400 com gradientes, bordas com glow responsivo e transições suaves), além de um motor autônomo de lembretes, tarefas e rotinas.
+- **Sprint 4: Inteligência Autônoma** — Implementação do **The Algorithm (7 Fases)** do PAI (`OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN`), loop de auto-melhoria contínua e encadeamento de múltiplas ações.
+- **Sprint 5: Integrações Externas** — Módulos modulares de monitoramento proativo de redes sociais (YouTube, Twitter/X, Reddit, Discord) e apoio integrado a projetos de código (Git status, resumos de repositórios).
+- **Sprint 6: Jarvis Completo** — Fallback offline-first nativo via **Ollama** (Llama 3 / Qwen 2.5) em caso de queda de internet, visão computacional da tela e **Área de Trabalho Remota** segura (FastAPI + WebSockets + 2FA) para controlar o PC via smartphone.
 
 ---
 
-## 📜 Licença e Privacidade
-Este é um projeto privado. Todos os dados de voz são processados localmente ou via API segura, e o histórico de conversas permanece apenas na sua máquina.
+## 🔒 Privacidade e Licença
+
+A Kuri foi construída com a privacidade como prioridade fundamental. A detecção de voz e o processamento de áudio local rodam estritamente na sua máquina. O histórico de interações e o perfil de personalidade são salvos localmente em arquivos JSON/SQLite e nunca são compartilhados ou vendidos.
 
 ---
-*Criado com ❤️ para ser o melhor assistente que um dev pode ter.*
+*Forjado no Olimpo para ser a assistente definitiva do teu setup.*

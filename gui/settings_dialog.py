@@ -19,6 +19,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
+from config import USE_PREMIUM_TTS
+
 GUI_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "kuri_gui_config.json")
 
 
@@ -28,7 +30,7 @@ def load_gui_config() -> dict:
         "input_device": None,
         "output_device": None,
         "volume": 80,
-        "use_premium_tts": False,
+        "use_premium_tts": USE_PREMIUM_TTS,
         "widget_pos": None,
     }
     try:
