@@ -1,7 +1,6 @@
 import subprocess
 import os
 import webbrowser
-import json
 from datetime import datetime
 
 # ===== Mapa de aplicativos conhecidos (Windows) =====
@@ -93,7 +92,7 @@ def abrir_pasta(caminho: str) -> str:
 
     if os.path.isdir(alvo):
         os.startfile(alvo)
-        return f"Abrindo a pasta..."
+        return "Abrindo a pasta..."
     return f"Não encontrei a pasta '{caminho}'."
 
 
@@ -102,7 +101,7 @@ def capturar_tela() -> str:
         import pyautogui
         screenshot_path = os.path.expanduser("~/Desktop/kuri_screenshot.png")
         pyautogui.screenshot(screenshot_path)
-        return f"Print salvo na sua área de trabalho!"
+        return "Print salvo na sua área de trabalho!"
     except ImportError:
         return "Preciso do pyautogui instalado para isso. Roda: pip install pyautogui"
     except Exception as e:
@@ -140,6 +139,23 @@ def ajustar_volume(acao: str) -> str:
         return f"Erro no volume: {e}"
 
 
+def salvar_fato_usuario(fato: str) -> str:
+    """Salva uma informação importante sobre o usuário na memória de longo prazo."""
+    from memory import adicionar_fato
+    adicionar_fato(fato)
+    return f"Fato memorizado: {fato}"
+
+
+def atualizar_perfil_usuario(campo: str, valor: str) -> str:
+    """Atualiza informações básicas do perfil (nome_usuario, humor_atual, etc)."""
+    from memory import atualizar_perfil
+    # Converte strings de lista para lista real se necessário
+    if campo == "apelidos" and "," in valor:
+        valor = [v.strip() for v in valor.split(",")]
+    atualizar_perfil(campo, valor)
+    return f"Perfil atualizado: {campo} = {valor}"
+
+
 # ===== Registro de funções (usado pelo brain.py via function calling) =====
 REGISTRY = {
     "abrir_aplicativo": abrir_aplicativo,
@@ -150,6 +166,8 @@ REGISTRY = {
     "abrir_pasta": abrir_pasta,
     "capturar_tela": capturar_tela,
     "ajustar_volume": ajustar_volume,
+    "salvar_fato_usuario": salvar_fato_usuario,
+    "atualizar_perfil_usuario": atualizar_perfil_usuario,
 }
 
 # ===== Definição de Tools para Function Calling do LLM =====
@@ -255,6 +273,35 @@ TOOLS_SCHEMA = [
                     }
                 },
                 "required": ["acao"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "salvar_fato_usuario",
+            "description": "Salva um fato importante sobre o usuário (ex: 'ele gosta de café amargo', 'ele é programador').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fato": {"type": "string", "description": "O fato a ser lembrado"}
+                },
+                "required": ["fato"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "atualizar_perfil_usuario",
+            "description": "Atualiza campos do perfil do usuário (nome_usuario, apelidos, humor_atual).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "campo": {"type": "string", "description": "Campo a atualizar", "enum": ["nome_usuario", "apelidos", "humor_atual"]},
+                    "valor": {"type": "string", "description": "Novo valor"}
+                },
+                "required": ["campo", "valor"]
             }
         }
     },

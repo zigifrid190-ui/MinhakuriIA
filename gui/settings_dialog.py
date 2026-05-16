@@ -14,10 +14,9 @@ import sounddevice as sd
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QSlider, QPushButton, QFrame,
-    QCheckBox, QSpacerItem, QSizePolicy
+    QCheckBox
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
 
 from config import USE_PREMIUM_TTS
 
@@ -210,7 +209,9 @@ class SettingsDialog(QDialog):
         title.setObjectName("title")
         layout.addWidget(title)
 
-        sep = QFrame(); sep.setObjectName("separator"); layout.addWidget(sep)
+        sep = QFrame()
+        sep.setObjectName("separator")
+        layout.addWidget(sep)
 
         # ── Entrada de Áudio ──────────────────────────────────────────────
         sec_in = QLabel("// ENTRADA — MICROFONE")
@@ -228,7 +229,9 @@ class SettingsDialog(QDialog):
         self.output_combo = QComboBox()
         layout.addWidget(self.output_combo)
 
-        sep2 = QFrame(); sep2.setObjectName("separator"); layout.addWidget(sep2)
+        sep2 = QFrame()
+        sep2.setObjectName("separator")
+        layout.addWidget(sep2)
 
         # ── Volume ────────────────────────────────────────────────────────
         vol_row = QHBoxLayout()
@@ -249,7 +252,9 @@ class SettingsDialog(QDialog):
         )
         layout.addWidget(self.volume_slider)
 
-        sep3 = QFrame(); sep3.setObjectName("separator"); layout.addWidget(sep3)
+        sep3 = QFrame()
+        sep3.setObjectName("separator")
+        layout.addWidget(sep3)
 
         # ── TTS Premium ───────────────────────────────────────────────────
         self.premium_check = QCheckBox("Usar ElevenLabs (TTS Premium)")

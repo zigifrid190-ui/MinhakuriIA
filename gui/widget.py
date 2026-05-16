@@ -9,7 +9,6 @@ Design: GAMER HUD MINIMALISTA
 """
 
 import os
-import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFrame, QSizePolicy, QApplication
@@ -17,10 +16,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 from PyQt6.QtCore import (
-    Qt, QUrl, QTimer, QPoint, QPropertyAnimation,
-    QEasingCurve, pyqtSignal, QObject
+    Qt, QUrl, QTimer, QPoint, pyqtSignal, QObject
 )
-from PyQt6.QtGui import QFont, QColor, QPalette, QCursor
 
 from gui.kuri_bridge import KuriState, bridge
 from gui.settings_dialog import SettingsDialog, load_gui_config, save_gui_config

@@ -3,10 +3,10 @@ Diagnostico de microfone v3
 """
 import sys
 import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-
 import sounddevice as sd
 import numpy as np
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 # 1. Lista dispositivos de input
 print("=" * 60)
@@ -71,7 +71,7 @@ try:
     print("=" * 60)
     print(f"  Amplitude MAXIMA:  {max_amp:.1f}")
     print(f"  Amplitude MEDIA:   {avg_amp:.1f}")
-    print(f"  Threshold no stt.py: 500")
+    print("  Threshold no stt.py: 500")
     print()
 
     if max_amp < 10:
@@ -80,7 +80,7 @@ try:
         print("     -> Tente: Settings > Sound > Input > escolha o mic certo.")
     elif max_amp < 500:
         sugestao = max(int(max_amp * 0.3), 20)
-        print(f"  [!] Audio detectado mas ABAIXO do threshold (500)!")
+        print("  [!] Audio detectado mas ABAIXO do threshold (500)!")
         print(f"     -> Amplitude maxima: {max_amp:.0f}")
         print(f"     -> SOLUCAO: Reduzir SILENCE_THRESHOLD no stt.py para ~{sugestao}")
     else:

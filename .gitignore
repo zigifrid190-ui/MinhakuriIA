@@ -34,6 +34,7 @@ kuri_resposta.mp3
 kuri_log.txt
 *.mp3
 *.wav
+*.db
 
 # IDEs
 .vscode/

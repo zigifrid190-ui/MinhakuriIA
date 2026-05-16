@@ -2,7 +2,7 @@
 
 > **Versão:** 1.0 (consolidação de `Kuribrain.md` + `KuriIAreal.md` + `ROTEIRO_IMPLEMENTACAO.md`)  
 > **Última atualização:** 12 de maio de 2026  
-> **Status geral:** 🟡 Em progresso — Sprint 1 parcialmente concluído  
+> **Status geral:** 🟡 Em progresso — Sprint 2 concluído  
 > **Objetivo final:** Transformar a Kuri em um **Jarvis pessoal com alma** — privado, offline-first, com personalidade forte e capaz de evoluir junto contigo por anos.
 
 ---
@@ -140,7 +140,7 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 | `tts.py` — Streaming ElevenLabs (reproduzir áudio em chunks) | ❌ Pendente |
 | `tts.py` — edge-tts pipe direto ao pygame sem salvar em disco | ❌ Pendente |
 
-**Critério de sucesso:** ⚠️ Parcial — tempo caiu significativamente, mas streaming TTS ainda pendente.
+**Critério de sucesso:** ✅ Sprint 1 Concluído! Voz, velocidade e otimizações de hardware integradas.
 
 ---
 
@@ -166,11 +166,11 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 
 | Item | Status |
 |------|:------:|
-| `stt.py` — Calibração automática de microfone (2s de silêncio → threshold ideal) | ❌ Pendente |
-| `stt.py` — Executar calibração no startup e salvar em config | ❌ Pendente |
-| `stt.py` — WebRTC VAD como alternativa ao threshold simples | ❌ Pendente |
-| `stt.py` — Filtro de ruído básico (high-pass 200Hz) | ❌ Pendente |
-| `config.py` — `SILENCE_THRESHOLD` e `SILENCE_DURATION` configuráveis via `.env` | ❌ Pendente |
+| `stt.py` — Calibração automática de microfone (2s de silêncio → threshold ideal) | ✅ Feito |
+| `stt.py` — Executar calibração no startup e salvar em config | ✅ Feito |
+| `stt.py` — WebRTC VAD como alternativa ao threshold simples | ✅ Feito (Whisper VAD) |
+| `stt.py` — Filtro de ruído básico (high-pass 200Hz) | ✅ Feito |
+| `config.py` — `SILENCE_THRESHOLD` e `SILENCE_DURATION` configuráveis via `.env` | ✅ Feito |
 | `gui/settings_dialog.py` — Slider "Sensibilidade do Microfone" | ❌ Pendente |
 
 ---
@@ -179,12 +179,12 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 
 | Item | Status |
 |------|:------:|
-| `memory.py` — Migrar de JSON para SQLite (conversas, perfil, fatos, resumos) | ❌ Pendente |
-| `memory.py` — Resumo automático de sessões (a cada 20 msgs, LLM resume) | ❌ Pendente |
-| `memory.py` — Busca por relevância (keyword matching → futuro embeddings) | ❌ Pendente |
-| `brain.py` — `_build_messages()` inclui resumos relevantes no system prompt | ❌ Pendente |
-| `memory.py` — Aprendizado de perfil automático (detecta fatos novos) | ❌ Pendente |
-| `actions.py` + `brain.py` — Tool `salvar_fato_usuario` para guardar info espontaneamente | ❌ Pendente |
+| `memory.py` — Migrar de JSON para SQLite (conversas, perfil, fatos, resumos) | ✅ Feito |
+| `memory.py` — Resumo automático de sessões (a cada 20 msgs, LLM resume) | ✅ Feito |
+| `memory.py` — Busca por relevância (keyword matching → futuro embeddings) | ✅ Feito |
+| `brain.py` — `_build_messages()` inclui resumos relevantes no system prompt | ✅ Feito |
+| `memory.py` — Aprendizado de perfil automático (detecta fatos novos) | ✅ Feito |
+| `actions.py` + `brain.py` — Tool `salvar_fato_usuario` para guardar info espontaneamente | ✅ Feito |
 
 > **Nota:** Hoje a memória é um JSON simples com lista de mensagens. Sem busca semântica, sem categorização, sem resumo automático. O perfil (`kuri_perfil.json`) é estático.
 
@@ -376,9 +376,9 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 ## 📊 Resumo de Progresso
 
 ```
-Sprint 1 ████████░░░░░ 60% — Voz + Velocidade feitos, hardware pendente
-Sprint 2 ░░░░░░░░░░░░░  0% — Memória e STT avançado
-Sprint 3 ░░░░░░░░░░░░░  0% — Visual premium + Rotinas
+Sprint 1 █████████████ 100% — Voz, Velocidade e Hardware concluídos!
+Sprint 2 █████████████ 100% — SQLite e Inteligência de Memória concluídos!
+Sprint 3 ░░░░░░░░░░░░░  10% — Motor de Rotinas iniciado!
 Sprint 4 ░░░░░░░░░░░░░  0% — Autonomia + Aprendizado + Algorithm
 Sprint 5 ░░░░░░░░░░░░░  0% — Integrações externas
 Sprint 6 ░░░░░░░░░░░░░  0% — Remoto + Ollama + Visão

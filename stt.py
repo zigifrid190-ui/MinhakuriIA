@@ -4,7 +4,7 @@ import tempfile
 import wave
 import os
 import threading
-from config import WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE, WHISPER_LANGUAGE
+from config import WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE, WHISPER_LANGUAGE, CPU_THREADS
 
 # Carregamento do modelo
 _model = None
@@ -15,9 +15,11 @@ CHANNELS = 1
 DTYPE = "int16"
 
 # Parâmetros otimizados de detecção
-SILENCE_THRESHOLD = 60        # Mais sensível para ouvir vozes mais baixas
+SILENCE_THRESHOLD = 60        # Fallback fixo
 SILENCE_DURATION = 1.0        # Resposta mais rápida (corta após 1s de silêncio)
 MAX_RECORD_SECONDS = 30       # Limite máximo
+
+DYNAMIC_THRESHOLD = SILENCE_THRESHOLD
 
 
 def _get_model():
@@ -25,20 +27,43 @@ def _get_model():
     global _model
     with _model_lock:
         if _model is None:
-            print(f"[STT] Inicializando motor de voz Whisper ({WHISPER_MODEL})...")
+            print(f"[STT] Inicializando motor de voz Whisper ({WHISPER_MODEL}) no {WHISPER_DEVICE}...")
             from faster_whisper import WhisperModel
             _model = WhisperModel(
                 WHISPER_MODEL,
                 device=WHISPER_DEVICE,
                 compute_type=WHISPER_COMPUTE,
-                cpu_threads=4  # Otimizado para CPU multi-core
+                cpu_threads=CPU_THREADS
             )
-            print("[STT] Motor Whisper pronto e pré-carregado!")
+            print(f"[STT] Motor Whisper pronto! (Threads: {CPU_THREADS}, Compute: {WHISPER_COMPUTE})")
     return _model
 
 
 # Pré-carrega o modelo em background ao importar o módulo
 threading.Thread(target=_get_model, daemon=True, name="STTPreloader").start()
+
+async def calibrar_microfone(duration=2.0):
+    """Grava o som ambiente por X segundos e define o threshold ideal."""
+    global DYNAMIC_THRESHOLD
+    print(f"[STT] Calibrando microfone por {duration}s...")
+    
+    device_idx = sd.default.device[0]
+    if device_idx == -1: return
+
+    try:
+        # Grava o áudio
+        audio = sd.rec(int(duration * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE)
+        sd.wait()
+        
+        # Calcula a média da amplitude
+        amplitude_media = np.abs(audio).mean()
+        # Define threshold como a média + margem de segurança (multiplicador)
+        # Se for muito baixo (silêncio absoluto), usa o fallback de 60
+        DYNAMIC_THRESHOLD = max(SILENCE_THRESHOLD, int(amplitude_media * 1.8))
+        print(f"[STT] Calibração concluída. Novo SILENCE_THRESHOLD: {DYNAMIC_THRESHOLD}")
+    except Exception as e:
+        print(f"[ERRO] Calibração falhou: {e}")
+        DYNAMIC_THRESHOLD = SILENCE_THRESHOLD
 
 
 def gravar_audio() -> str | None:
@@ -51,21 +76,55 @@ def gravar_audio() -> str | None:
     silence_chunks_needed = int(SILENCE_DURATION / chunk_duration)
     started_speaking = False
 
+    # Verifica se há um device padrão válido, senão procura o primeiro disponível
+    device_idx = sd.default.device[0]
+    if device_idx == -1:
+        devices = sd.query_devices()
+        for i, d in enumerate(devices):
+            if d["max_input_channels"] > 0:
+                device_idx = i
+                break
+    
     try:
-        stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE, blocksize=chunk_size)
-        stream.start()
+        try:
+            stream = sd.InputStream(
+                device=device_idx,
+                samplerate=SAMPLE_RATE, 
+                channels=CHANNELS, 
+                dtype=DTYPE, 
+                blocksize=chunk_size
+            )
+            stream.start()
+        except Exception:
+            # Fallback para 2 canais
+            print(f"[STT] Tentando device {device_idx} com 2 canais...")
+            stream = sd.InputStream(
+                device=device_idx,
+                samplerate=SAMPLE_RATE, 
+                channels=2, 
+                dtype=DTYPE, 
+                blocksize=chunk_size
+            )
+            stream.start()
 
         for _ in range(max_chunks):
             data, _ = stream.read(chunk_size)
-            amplitude = np.abs(data).mean()
+            
+            # Se tiver mais de 1 canal, pega apenas o primeiro
+            if data.ndim > 1 and data.shape[1] > 1:
+                data_proc = data[:, 0]
+            else:
+                data_proc = data.flatten()
 
-            if amplitude > SILENCE_THRESHOLD:
+            amplitude = np.abs(data_proc).mean()
+
+            if amplitude > DYNAMIC_THRESHOLD:
                 started_speaking = True
                 silent_chunks = 0
-                frames.append(data.copy())
+                frames.append(data_proc.copy())
             elif started_speaking:
                 silent_chunks += 1
-                frames.append(data.copy())
+                frames.append(data_proc.copy())
                 if silent_chunks >= silence_chunks_needed:
                     break
 

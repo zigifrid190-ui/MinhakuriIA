@@ -16,7 +16,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QIcon
 from gui.widget import KuriWidget
 from gui.kuri_core import start_core_thread
 

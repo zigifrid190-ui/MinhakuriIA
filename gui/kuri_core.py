@@ -11,6 +11,7 @@ import threading
 import sounddevice as sd
 from gui.kuri_bridge import KuriState, bridge
 from gui.settings_dialog import load_gui_config
+import routines
 
 
 def _get_device_index(device_name_or_index) -> int | None:
@@ -36,12 +37,17 @@ async def _kuri_voice_loop():
     Loop principal de voz da Kuri em modo contínuo.
     Roda como coroutine asyncio dentro de uma thread dedicada.
     """
-    from stt import ouvir, SAMPLE_RATE, SILENCE_THRESHOLD, SILENCE_DURATION
+    from stt import ouvir, calibrar_microfone
     from tts import falar
     from brain import pensar
 
     # Aplica config de dispositivos de áudio
     _apply_audio_config()
+    
+    # Calibração inicial (opcional, para definir sensibilidade)
+    bridge.set_state(KuriState.THINKING)
+    bridge.emit_text("[Calibrando microfone...]")
+    await calibrar_microfone(duration=1.5)
 
     # Saudação inicial
     bridge.set_state(KuriState.SPEAKING)
@@ -69,9 +75,15 @@ async def _kuri_voice_loop():
             break
 
         if not texto or not texto.strip():
-            bridge.set_state(KuriState.IDLE)
-            await asyncio.sleep(0.1)
-            continue
+            # Tenta disparar uma interação proativa
+            proativo = await routines.check_proactivity()
+            if proativo:
+                texto = proativo
+                bridge.emit_text("[Iniciando conversa proativa...]")
+            else:
+                bridge.set_state(KuriState.IDLE)
+                await asyncio.sleep(0.1)
+                continue
 
         # ── Pensar ─────────────────────────────────────────────────────────
         bridge.set_state(KuriState.THINKING)
@@ -103,7 +115,7 @@ async def _kuri_voice_loop():
             config = load_gui_config()
             usar_premium = config.get("use_premium_tts", False)
             
-            await falar(resposta, premium=usar_premium)
+            await falar(resposta, premium=usar_premium, emocao=emocao)
 
         bridge.set_state(KuriState.IDLE)
         bridge.set_emotion("neutral")

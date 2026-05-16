@@ -1,6 +1,6 @@
 # 🤖 Kuri IA — Seu Assistente Desktop Pessoal (Jarvis Mode)
 
-![Status](https://img.shields.io/badge/Status-v0.5_Desktop_Assistant-green?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-v1.2_Cognitive_Update-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6-darkblue?style=for-the-badge)
 ![Privacidade](https://img.shields.io/badge/Privacidade-Local__First-orange?style=for-the-badge)
@@ -17,7 +17,12 @@ A Kuri evoluiu de um simples chatbot para uma aplicação desktop nativa ultrarr
 - **🔊 Voz Premium com Cache:** Integração nativa com a voz profissional da **ElevenLabs** (com sistema de cache local em `tts_cache/` para economizar créditos) e fallback automático para `edge-tts` gratuito.
 - **🧠 Cérebro Inteligente (Brain):** Conectada ao Grok-4 (xAI) com **Function Calling**, permitindo à Kuri decidir autonomamente quando conversar ou quando executar comandos no seu PC.
 - **🖥️ Controle do Sistema:** Possui 8 ações nativas cadastradas para abrir/fechar apps, fazer pesquisas na web, consultar hora/data, criar/abrir pastas do sistema, tirar prints e controlar o volume do Windows em tempo real.
-- **✨ Interface Viva (Gamer HUD):** Janela flutuante desenvolvida em **PyQt6** (260x320, sem bordas, always-on-top e arrastável) com um sistema de avatares em vídeo MP4 em loop nativo que reagem dinamicamente a 5 estados emocionais mapeados pelo LLM (`neutral`, `cool`, `surprised`, `blushing`, `angry`).
+- **✨ Interface Viva (Gamer HUD):** Janela flutuante desenvolvida em **PyQt6** com avatares que reagem dinamicamente a 5 estados emocionais mapeados pelo LLM.
+- **🧠 Upgrades Cognitivos (NOVO):**
+    - **Consciência Temporal:** Ela agora entende o momento do dia (manhã, tarde, noite, madrugada) e adapta seu comportamento.
+    - **Prosódia Emocional:** A voz da Kuri muda de tom, velocidade e estilo dependendo da emoção detectada.
+    - **Micro-Proatividade:** Motor de rotinas que permite à Kuri quebrar o silêncio e interagir espontaneamente com você.
+    - **Memória de Longo Prazo:** Migração total para **SQLite** com busca por relevância e resumos automáticos de sessões para um contexto infinito.
 
 ---
 
@@ -69,9 +74,9 @@ O desenvolvimento da Kuri segue uma filosofia inspirada na arquitetura **PAI (Pe
 Para ver todos os detalhes técnicos, tarefas e checklists de cada etapa, consulte nosso documento oficial: **[KURI_ROADMAP.md](./KURI_ROADMAP.md)**.
 
 ### Resumo dos Sprints:
-- **Sprint 1 (Atual): Performance e Voz** — Concluída a integração com ElevenLabs, cache local, otimização de latência do Whisper e responsividade da GUI. *(Pendente otimização de consumo de RAM/CPU para hardware modesto).*
-- **Sprint 2: Inteligência e Memória** — Migração da memória JSON para **SQLite** com resumos automáticos de contexto, busca semântica, calibração automática de microfone e suporte nativo ao Python 3.12+.
-- **Sprint 3: Visual Premium e Rotinas** — Redesign da interface (300x400 com gradientes, bordas com glow responsivo e transições suaves), além de um motor autônomo de lembretes, tarefas e rotinas.
+- **Sprint 1: Performance e Voz** — ✅ CONCLUÍDO. Integração ElevenLabs, cache local e latência otimizada.
+- **Sprint 2: Inteligência e Memória** — ✅ CONCLUÍDO. SQLite, resumos automáticos, busca por relevância, calibração de microfone e aprendizado ativo de perfil.
+- **Sprint 3: Visual Premium e Rotinas** — 🟡 EM PROGRESSO. Redesign da interface (gradientes, glow, modo compacto) e motor de rotinas iniciado.
 - **Sprint 4: Inteligência Autônoma** — Implementação do **The Algorithm (7 Fases)** do PAI (`OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN`), loop de auto-melhoria contínua e encadeamento de múltiplas ações.
 - **Sprint 5: Integrações Externas** — Módulos modulares de monitoramento proativo de redes sociais (YouTube, Twitter/X, Reddit, Discord) e apoio integrado a projetos de código (Git status, resumos de repositórios).
 - **Sprint 6: Jarvis Completo** — Fallback offline-first nativo via **Ollama** (Llama 3 / Qwen 2.5) em caso de queda de internet, visão computacional da tela e **Área de Trabalho Remota** segura (FastAPI + WebSockets + 2FA) para controlar o PC via smartphone.
