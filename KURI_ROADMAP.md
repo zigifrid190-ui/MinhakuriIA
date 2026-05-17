@@ -1,8 +1,8 @@
 # 🧠 KURI IA — Roadmap Unificado
 
 > **Versão:** 1.0 (consolidação de `Kuribrain.md` + `KuriIAreal.md` + `ROTEIRO_IMPLEMENTACAO.md`)  
-> **Última atualização:** 12 de maio de 2026  
-> **Status geral:** 🟡 Em progresso — Sprint 2 concluído  
+> **Última atualização:** 17 de maio de 2026  
+> **Status geral:** 🟡 Em progresso — Sprint 4 concluído  
 > **Objetivo final:** Transformar a Kuri em um **Jarvis pessoal com alma** — privado, offline-first, com personalidade forte e capaz de evoluir junto contigo por anos.
 
 ---
@@ -249,11 +249,12 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 |------|:------:|
 | Rodar profiler no loop principal (cProfile / py-spy) | ❌ Pendente |
 | Identificar gargalos de I/O (disco vs rede) | ❌ Pendente |
-| Refatorar `brain.py` — bug: segunda chamada LLM usa `client` fora do context manager | ❌ Pendente |
-| Adicionar logs estruturados (`logging` module) em vez de `print()` | ❌ Pendente |
-| Tratamento de erro granular em cada módulo | ❌ Pendente |
-| **[NOVO]** `tests/` — Testes unitários para memory.py, actions.py, mocks para brain.py | ❌ Pendente |
-| Documentar cada módulo com docstrings completas | ❌ Pendente |
+| Refatorar `brain.py` — bug: segunda chamada LLM usa `client` fora do context manager | ✅ Feito |
+| Adicionar logs estruturados (`logging` module) em vez de `print()` | ✅ Feito |
+| Tratamento de erro granular em cada módulo | ✅ Feito |
+| **[NOVO]** `tests/` — Testes unitários para memory.py, actions.py, mocks para brain.py | ✅ Feito (32 testes) |
+| Documentar cada módulo com docstrings completas | ✅ Feito |
+| **[NOVO]** Auditoria de Segurança (Bandit) e Code Quality (Flake8/Black) | ✅ Feito |
 
 ---
 
@@ -261,9 +262,9 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 
 | Item | Status |
 |------|:------:|
-| `memory.py` — Tabela `insights` (preferencia, habito, estilo, assunto) | ❌ Pendente |
-| `brain.py` — A cada N conversas, LLM extrai insights automaticamente | ❌ Pendente |
-| `brain.py` — Incorporar insights no system prompt dinamicamente | ❌ Pendente |
+| `memory.py` — Tabela `insights` (preferencia, habito, estilo, assunto) | ✅ Feito |
+| `brain.py` — A cada N conversas, LLM extrai insights automaticamente | ✅ Feito (cada 25 msgs) |
+| `brain.py` — Incorporar insights no system prompt dinamicamente | ✅ Feito |
 | `brain.py` — Auto-avaliação a cada 50 conversas | ❌ Pendente |
 
 ---
@@ -272,9 +273,9 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 
 | Item | Status |
 |------|:------:|
-| `actions.py` — Novas ações: notificação, clipboard, executar comando, listar processos, info sistema | ❌ Pendente |
-| `brain.py` — Chains: múltiplas ações em sequência ("Abre Chrome e pesquisa X") | ❌ Pendente |
-| Modo proativo baseado em rotinas (Sprint 3.2) | ❌ Pendente |
+| `actions.py` — Novas ações: notificação, clipboard, executar comando, listar processos, info sistema | ✅ Feito |
+| `brain.py` — Chains: múltiplas ações em sequência ("Abre Chrome e pesquisa X") | ✅ Feito (loop até 5 iterações) |
+| Modo proativo baseado em rotinas (Sprint 3.2) | ✅ Feito |
 
 ---
 
@@ -282,8 +283,8 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 
 | Item | Status |
 |------|:------:|
-| Implementar loop OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN | ❌ Pendente |
-| Substituir raciocínio simples por loop estruturado | ❌ Pendente |
+| Implementar loop OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN | ✅ Feito (AGENT_ALGORITHM no prompt) |
+| Substituir raciocínio simples por loop estruturado | ✅ Feito (tool chains) |
 | Framework de Skills carregáveis dinamicamente (evolução do actions.py) | ❌ Pendente |
 | Sistema de Hooks (antes/depois de cada comando) | ❌ Pendente |
 
@@ -346,7 +347,6 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 | Detecção automática de conectividade | ❌ Pendente |
 
 ---
-
 #### 6.2 — Área de Trabalho Remota
 
 | Item | Status |
@@ -378,8 +378,8 @@ Você fala "Ei Kuri" → Ela acorda → Escuta → Pensa (7 fases) → Responde 
 ```
 Sprint 1 █████████████ 100% — Voz, Velocidade e Hardware concluídos!
 Sprint 2 █████████████ 100% — SQLite e Inteligência de Memória concluídos!
-Sprint 3 ░░░░░░░░░░░░░  10% — Motor de Rotinas iniciado!
-Sprint 4 ░░░░░░░░░░░░░  0% — Autonomia + Aprendizado + Algorithm
+Sprint 3 █████████████ 100% — UI Premium e Rotinas de Tarefas concluídos!
+Sprint 4 ██████████░░░  80% — Logger, Insights, Tool Chains, Algorithm!
 Sprint 5 ░░░░░░░░░░░░░  0% — Integrações externas
 Sprint 6 ░░░░░░░░░░░░░  0% — Remoto + Ollama + Visão
 ```
@@ -392,8 +392,8 @@ Sprint 6 ░░░░░░░░░░░░░  0% — Remoto + Ollama + Visã
 |:------:|---------------------|----------------|
 | **1** | `config.py`, `tts.py`, `stt.py`, `brain.py`, `gui/kuri_core.py`, `gui/settings_dialog.py` | — |
 | **2** | `memory.py`, `stt.py`, `brain.py`, `config.py`, `gui/settings_dialog.py`, `requirements.txt` | — |
-| **3** | `gui/widget.py` | `gui/styles.py`, `gui/animations.py`, `routines.py` |
-| **4** | `brain.py`, `memory.py`, `actions.py` | `tests/`, `logger.py` |
+| **3** | `gui/widget.py`, `memory.py`, `actions.py`, `brain.py`, `routines.py`, `main.py` | `gui/design_system.py`, `gui/animations.py` |
+| **4** | `brain.py`, `memory.py`, `actions.py`, `tts.py`, `stt.py`, `routines.py`, `gui/kuri_core.py` | `logger.py`, `tests/test_memory.py`, `tests/test_actions.py` |
 | **5** | `brain.py`, `actions.py` | `integrations/social_monitor.py`, `integrations/project_assistant.py` |
 | **6** | `config.py`, `brain.py` | `remote/server.py`, `remote/client.py`, `remote/auth.py` |
 
@@ -417,15 +417,15 @@ Sprint 6 ░░░░░░░░░░░░░  0% — Remoto + Ollama + Visã
 - ✅ `prompt_kuri.txt` — A personalidade é perfeita, não mude.
 - ✅ Sistema emocional do `brain.py` — O emotional_context já é ótimo.
 - ✅ Chaves de API (Grok, ElevenLabs) — Continuam sendo usadas.
-- ✅ Widget PyQt6 com avatar animado — Base sólida.
-- ✅ Function calling no brain.py — Padrão correto.
+- ✅ Widget PyQt6 com avatar animado — Base sólida premium atingida na Sprint 3.
+- ✅ Function calling no brain.py — Padrão correto (bug de HTTP Client fixado).
 - ✅ Cache de TTS — Implementação eficiente.
 
 ## ⚠️ O que foi REMOVIDO/SUBSTITUÍDO
 
 - ❌ FastAPI — Não precisa de server HTTP. Kuri roda direto no desktop.
 - ❌ HeyGen — Caro demais. Substituído pelo avatar visual local (MP4 loop).
-- ❌ `httpx` como backbone — Mantido apenas para chamadas de API.
+- ❌ `httpx` como backbone — Mantido apenas para chamadas de API (com lifecycle fixado na v1.3).
 
 ---
 
@@ -444,10 +444,7 @@ Chatbot API     →    Desktop Voice    →    Visual Premium   →    Jarvis Au
 ---
 
 > [!TIP]
-> **Próximo passo recomendado:** Finalizar o Sprint 1.3 (otimização hardware) e iniciar o Sprint 2 (memória SQLite + STT avançado). A memória é o que vai dar inteligência real à Kuri.
+> **Próximo passo recomendado:** Completar os itens restantes da Sprint 4 (profiling, skills dinâmicas, hooks) ou iniciar a **Sprint 5** (Integrações Externas: YouTube, Git, GitHub).
 
 > [!WARNING]
 > **APIs pagas:** ElevenLabs tem limite de créditos. O cache (`tts_cache/`) já está implementado — mantenha-o SEMPRE ativo.
-
-> [!IMPORTANT]
-> **Bug conhecido no brain.py:** A segunda chamada ao LLM (follow-up de tool call) pode falhar porque o `async with httpx.AsyncClient` pode já ter sido fechado. Corrigir no Sprint 4.1.

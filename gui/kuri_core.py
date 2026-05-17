@@ -12,6 +12,9 @@ import sounddevice as sd
 from gui.kuri_bridge import KuriState, bridge
 from gui.settings_dialog import load_gui_config
 import routines
+from logger import get_logger
+
+log = get_logger("core")
 
 
 def _get_device_index(device_name_or_index) -> int | None:
@@ -43,7 +46,7 @@ async def _kuri_voice_loop():
 
     # Aplica config de dispositivos de áudio
     _apply_audio_config()
-    
+
     # Calibração inicial (opcional, para definir sensibilidade)
     bridge.set_state(KuriState.THINKING)
     bridge.emit_text("[Calibrando microfone...]")
@@ -110,11 +113,11 @@ async def _kuri_voice_loop():
             bridge.set_state(KuriState.SPEAKING)
             bridge.set_emotion(emocao)
             bridge.emit_text(resposta)
-            
+
             # Carrega config da GUI para ver se deve usar premium
             config = load_gui_config()
             usar_premium = config.get("use_premium_tts", False)
-            
+
             await falar(resposta, premium=usar_premium, emocao=emocao)
 
         bridge.set_state(KuriState.IDLE)
@@ -127,13 +130,14 @@ def start_core_thread():
     Inicia o loop asyncio do core em uma thread daemon separada.
     Retorna a thread para controle externo.
     """
+
     def _run():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(_kuri_voice_loop())
         except Exception as e:
-            print(f"[CORE] Erro fatal no loop: {e}")
+            log.critical(f"Erro fatal no loop: {e}")
             bridge.set_state(KuriState.ERROR)
         finally:
             loop.close()

@@ -47,7 +47,9 @@ def fechar_aplicativo(nome: str) -> str:
     try:
         result = subprocess.run(
             ["taskkill", "/IM", f"{nome_lower}.exe", "/F"],
-            capture_output=True, text=True, timeout=5
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return f"Fechei o {nome}!"
@@ -99,6 +101,7 @@ def abrir_pasta(caminho: str) -> str:
 def capturar_tela() -> str:
     try:
         import pyautogui
+
         screenshot_path = os.path.expanduser("~/Desktop/kuri_screenshot.png")
         pyautogui.screenshot(screenshot_path)
         return "Print salvo na sua área de trabalho!"
@@ -142,6 +145,7 @@ def ajustar_volume(acao: str) -> str:
 def salvar_fato_usuario(fato: str) -> str:
     """Salva uma informação importante sobre o usuário na memória de longo prazo."""
     from memory import adicionar_fato
+
     adicionar_fato(fato)
     return f"Fato memorizado: {fato}"
 
@@ -149,11 +153,162 @@ def salvar_fato_usuario(fato: str) -> str:
 def atualizar_perfil_usuario(campo: str, valor: str) -> str:
     """Atualiza informações básicas do perfil (nome_usuario, humor_atual, etc)."""
     from memory import atualizar_perfil
+
     # Converte strings de lista para lista real se necessário
     if campo == "apelidos" and "," in valor:
         valor = [v.strip() for v in valor.split(",")]
     atualizar_perfil(campo, valor)
     return f"Perfil atualizado: {campo} = {valor}"
+
+
+def gerenciar_tarefa(
+    acao: str, titulo: str = None, task_id: int = None, prioridade: int = 1
+) -> str:
+    """Cria, conclui ou remove tarefas da lista do usuário."""
+    from memory import adicionar_tarefa, concluir_tarefa, remover_tarefa
+
+    if acao == "criar":
+        if not titulo:
+            return "Preciso de um título para criar a tarefa, velho."
+        adicionar_tarefa(titulo, prioridade)
+        return f"Beleza, anotei aqui: '{titulo}'."
+
+    elif acao == "concluir":
+        if task_id is None:
+            return "Qual o ID da tarefa que tu terminou?"
+        if concluir_tarefa(task_id):
+            return f"Boa! Marquei a tarefa {task_id} como feita."
+        return f"Não achei nenhuma tarefa com o ID {task_id}."
+
+    elif acao == "remover":
+        if task_id is None:
+            return "Qual o ID da tarefa para deletar?"
+        if remover_tarefa(task_id):
+            return f"Tarefa {task_id} removida do seu histórico."
+        return f"ID {task_id} não encontrado."
+
+    return f"Ação de tarefa desconhecida: {acao}"
+
+
+def listar_minhas_tarefas() -> str:
+    """Retorna uma lista formatada das tarefas pendentes."""
+    from memory import listar_tarefas
+
+    tasks = listar_tarefas(apenas_pendentes=True)
+    if not tasks:
+        return "Tu tá livre, velho! Nenhuma tarefa pendente."
+
+    output = "Aqui o que tu tem pra fazer:\n"
+    for t in tasks:
+        prio = "🔥" if t["prioridade"] >= 3 else "⚡" if t["prioridade"] == 2 else "📝"
+        output += f"- [{t['id']}] {prio} {t['titulo']}\n"
+    return output
+
+
+def ler_clipboard() -> str:
+    """Lê o conteúdo atual da área de transferência."""
+    try:
+        import win32clipboard
+
+        win32clipboard.OpenClipboard()
+        try:
+            data = win32clipboard.GetClipboardData()
+            return f"Clipboard: {data[:500]}" if data else "Clipboard vazio, velho."
+        finally:
+            win32clipboard.CloseClipboard()
+    except ImportError:
+        # Fallback via PowerShell
+        try:
+            result = subprocess.run(
+                ["powershell", "-Command", "Get-Clipboard"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return (
+                f"Clipboard: {result.stdout.strip()[:500]}"
+                if result.stdout.strip()
+                else "Clipboard vazio."
+            )
+        except Exception as e:
+            return f"Erro ao ler clipboard: {e}"
+    except Exception as e:
+        return f"Erro ao ler clipboard: {e}"
+
+
+def listar_processos() -> str:
+    """Lista os processos com maior uso de CPU."""
+    try:
+        import psutil
+
+        procs = []
+        for p in psutil.process_iter(["name", "cpu_percent", "memory_percent"]):
+            try:
+                info = p.info
+                if info["cpu_percent"] and info["cpu_percent"] > 0:
+                    procs.append(info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        procs.sort(key=lambda x: x.get("cpu_percent", 0), reverse=True)
+        top = procs[:10]
+        if not top:
+            return "Nenhum processo consumindo CPU significativamente."
+        lines = [
+            f"- {p['name']}: CPU {p['cpu_percent']:.1f}%, RAM {p.get('memory_percent', 0):.1f}%"
+            for p in top
+        ]
+        return "Top processos:\n" + "\n".join(lines)
+    except ImportError:
+        return "Preciso do psutil instalado para isso."
+    except Exception as e:
+        return f"Erro ao listar processos: {e}"
+
+
+def informacao_sistema() -> str:
+    """Retorna informações básicas do sistema."""
+    try:
+        import psutil
+        import platform
+
+        cpu = psutil.cpu_percent(interval=0.5)
+        ram = psutil.virtual_memory()
+        disco = psutil.disk_usage("C:\\")
+        bateria = psutil.sensors_battery()
+        bat_info = (
+            f", Bateria: {bateria.percent}%{'(carregando)' if bateria.power_plugged else ''}"
+            if bateria
+            else ""
+        )
+        return (
+            f"SO: {platform.system()} {platform.release()}, "
+            f"CPU: {cpu}%, "
+            f"RAM: {ram.percent}% ({ram.used // (1024**3)}/{ram.total // (1024**3)} GB), "
+            f"Disco C: {disco.percent}% usado{bat_info}"
+        )
+    except Exception as e:
+        return f"Erro ao buscar info do sistema: {e}"
+
+
+def enviar_notificacao(titulo: str, mensagem: str) -> str:
+    """Envia uma notificação toast no Windows."""
+    try:
+        from plyer import notification
+
+        notification.notify(
+            title=titulo, message=mensagem, app_name="Kuri IA", timeout=10
+        )
+        return f"Notificação enviada: {titulo}"
+    except ImportError:
+        # Fallback via PowerShell
+        try:
+            ps_script = f'[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null; $xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent(0); $xml.GetElementsByTagName("text")[0].AppendChild($xml.CreateTextNode("{titulo}: {mensagem}")) > $null; [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Kuri IA").Show([Windows.UI.Notifications.ToastNotification]::new($xml))'
+            # Bandit B602 fix: remove shell=True
+            subprocess.Popen(["powershell", "-Command", ps_script])
+            return f"Notificação enviada: {titulo}"
+        except Exception as e:
+            return f"Erro na notificação: {e}"
+    except Exception as e:
+        return f"Erro na notificação: {e}"
 
 
 # ===== Registro de funções (usado pelo brain.py via function calling) =====
@@ -168,6 +323,12 @@ REGISTRY = {
     "ajustar_volume": ajustar_volume,
     "salvar_fato_usuario": salvar_fato_usuario,
     "atualizar_perfil_usuario": atualizar_perfil_usuario,
+    "gerenciar_tarefa": gerenciar_tarefa,
+    "listar_minhas_tarefas": listar_minhas_tarefas,
+    "ler_clipboard": ler_clipboard,
+    "listar_processos": listar_processos,
+    "informacao_sistema": informacao_sistema,
+    "enviar_notificacao": enviar_notificacao,
 }
 
 # ===== Definição de Tools para Function Calling do LLM =====
@@ -180,11 +341,14 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "nome": {"type": "string", "description": "Nome do aplicativo (chrome, notepad, calculadora, etc)"}
+                    "nome": {
+                        "type": "string",
+                        "description": "Nome do aplicativo (chrome, notepad, calculadora, etc)",
+                    }
                 },
-                "required": ["nome"]
-            }
-        }
+                "required": ["nome"],
+            },
+        },
     },
     {
         "type": "function",
@@ -194,11 +358,14 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "nome": {"type": "string", "description": "Nome do aplicativo para fechar"}
+                    "nome": {
+                        "type": "string",
+                        "description": "Nome do aplicativo para fechar",
+                    }
                 },
-                "required": ["nome"]
-            }
-        }
+                "required": ["nome"],
+            },
+        },
     },
     {
         "type": "function",
@@ -210,17 +377,17 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "query": {"type": "string", "description": "O que pesquisar"}
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
         "function": {
             "name": "que_horas_sao",
             "description": "Retorna a hora e data atual. Use quando o usuário perguntar que horas são ou que dia é hoje.",
-            "parameters": {"type": "object", "properties": {}}
-        }
+            "parameters": {"type": "object", "properties": {}},
+        },
     },
     {
         "type": "function",
@@ -230,11 +397,14 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "nome": {"type": "string", "description": "Nome da pasta a ser criada"}
+                    "nome": {
+                        "type": "string",
+                        "description": "Nome da pasta a ser criada",
+                    }
                 },
-                "required": ["nome"]
-            }
-        }
+                "required": ["nome"],
+            },
+        },
     },
     {
         "type": "function",
@@ -244,19 +414,22 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "caminho": {"type": "string", "description": "Nome da pasta (downloads, documentos, desktop, imagens, musicas, videos) ou caminho absoluto"}
+                    "caminho": {
+                        "type": "string",
+                        "description": "Nome da pasta (downloads, documentos, desktop, imagens, musicas, videos) ou caminho absoluto",
+                    }
                 },
-                "required": ["caminho"]
-            }
-        }
+                "required": ["caminho"],
+            },
+        },
     },
     {
         "type": "function",
         "function": {
             "name": "capturar_tela",
             "description": "Tira um screenshot da tela e salva na área de trabalho.",
-            "parameters": {"type": "object", "properties": {}}
-        }
+            "parameters": {"type": "object", "properties": {}},
+        },
     },
     {
         "type": "function",
@@ -269,12 +442,12 @@ TOOLS_SCHEMA = [
                     "acao": {
                         "type": "string",
                         "description": "Ação de volume: aumentar, diminuir, mutar, desmutar",
-                        "enum": ["aumentar", "diminuir", "mutar", "desmutar"]
+                        "enum": ["aumentar", "diminuir", "mutar", "desmutar"],
                     }
                 },
-                "required": ["acao"]
-            }
-        }
+                "required": ["acao"],
+            },
+        },
     },
     {
         "type": "function",
@@ -286,9 +459,9 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "fato": {"type": "string", "description": "O fato a ser lembrado"}
                 },
-                "required": ["fato"]
-            }
-        }
+                "required": ["fato"],
+            },
+        },
     },
     {
         "type": "function",
@@ -298,11 +471,99 @@ TOOLS_SCHEMA = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "campo": {"type": "string", "description": "Campo a atualizar", "enum": ["nome_usuario", "apelidos", "humor_atual"]},
-                    "valor": {"type": "string", "description": "Novo valor"}
+                    "campo": {
+                        "type": "string",
+                        "description": "Campo a atualizar",
+                        "enum": ["nome_usuario", "apelidos", "humor_atual"],
+                    },
+                    "valor": {"type": "string", "description": "Novo valor"},
                 },
-                "required": ["campo", "valor"]
-            }
-        }
+                "required": ["campo", "valor"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "gerenciar_tarefa",
+            "description": "Gerencia a lista de tarefas (To-Do) do usuário. Use para criar, concluir ou remover itens.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "acao": {
+                        "type": "string",
+                        "description": "Ação a realizar",
+                        "enum": ["criar", "concluir", "remover"],
+                    },
+                    "titulo": {
+                        "type": "string",
+                        "description": "Título da tarefa (apenas para 'criar')",
+                    },
+                    "task_id": {
+                        "type": "integer",
+                        "description": "ID da tarefa (para 'concluir' ou 'remover')",
+                    },
+                    "prioridade": {
+                        "type": "integer",
+                        "description": "Prioridade de 1 a 3 (3 é urgente)",
+                        "default": 1,
+                    },
+                },
+                "required": ["acao"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "listar_minhas_tarefas",
+            "description": "Retorna a lista de todas as tarefas pendentes do usuário.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "ler_clipboard",
+            "description": "Lê o conteúdo atual da área de transferência (clipboard) do usuário.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "listar_processos",
+            "description": "Lista os processos rodando no PC com maior uso de CPU e RAM.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "informacao_sistema",
+            "description": "Retorna informações do sistema (CPU, RAM, disco, bateria, SO).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "enviar_notificacao",
+            "description": "Envia uma notificação toast no Windows para o usuário.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "titulo": {
+                        "type": "string",
+                        "description": "Título da notificação",
+                    },
+                    "mensagem": {
+                        "type": "string",
+                        "description": "Texto da notificação",
+                    },
+                },
+                "required": ["titulo", "mensagem"],
+            },
+        },
     },
 ]

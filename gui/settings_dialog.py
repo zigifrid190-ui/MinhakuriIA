@@ -12,9 +12,15 @@ import json
 import os
 import sounddevice as sd
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QComboBox, QSlider, QPushButton, QFrame,
-    QCheckBox
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QComboBox,
+    QSlider,
+    QPushButton,
+    QFrame,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt
 
@@ -194,10 +200,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("KURI — Configurações")
         self.setFixedSize(420, 360)
         self.setStyleSheet(STYLE)
-        self.setWindowFlags(
-            Qt.WindowType.Dialog |
-            Qt.WindowType.FramelessWindowHint
-        )
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
         layout = QVBoxLayout(self)

@@ -2,24 +2,39 @@ import json
 import httpx
 import asyncio
 from config import (
-    GROK_API_KEY, GROK_MODEL, GROK_TEMPERATURE,
-    GROK_MAX_TOKENS, GROK_URL, PROMPT_FILE, CONTEXT_WINDOW
+    GROK_API_KEY,
+    GROK_MODEL,
+    GROK_TEMPERATURE,
+    GROK_MAX_TOKENS,
+    GROK_URL,
+    PROMPT_FILE,
+    CONTEXT_WINDOW,
 )
 from memory import (
-    carregar_historico, adicionar_interacao, 
-    carregar_perfil, carregar_ultimo_resumo,
-    buscar_fatos_relevantes, salvar_resumo
+    carregar_historico,
+    adicionar_interacao,
+    carregar_perfil,
+    carregar_ultimo_resumo,
+    buscar_fatos_relevantes,
+    salvar_resumo,
+    listar_tarefas,
+    buscar_insights,
 )
 from actions import TOOLS_SCHEMA, REGISTRY
 from datetime import datetime
+from logger import get_logger
+
+log = get_logger("brain")
 
 # Carrega o prompt de personalidade
 try:
     with open(PROMPT_FILE, "r", encoding="utf-8") as f:
         BASE_PROMPT = f.read()
 except FileNotFoundError:
-    print(f"[WARN] {PROMPT_FILE} nao encontrado. Usando prompt padrao.")
-    BASE_PROMPT = "Você é a Kuri, uma assistente virtual brasileira sarcástica e carinhosa."
+    log.warning(f"{PROMPT_FILE} nao encontrado. Usando prompt padrao.")
+    BASE_PROMPT = (
+        "Você é a Kuri, uma assistente virtual brasileira sarcástica e carinhosa."
+    )
 
 EMOTIONAL_CONTEXT = """
 ESTADO EMOCIONAL ATUAL DA KURI (dinâmico):
@@ -44,44 +59,119 @@ REGRAS IMPORTANTES DE COMPORTAMENTO:
 - Exemplo de resposta: "[cool] Deixa comigo, velho. Já tô abrindo isso pra você."
 """
 
+AGENT_ALGORITHM = """
+PROTOCOLO DE RACIOCÍNIO (siga internamente, NÃO exponha ao usuário):
+1. OBSERVE: Leia o contexto (fatos, insights, tarefas, hora, humor) antes de responder.
+2. THINK: Determine o que o usuário realmente quer (mesmo que não tenha dito claramente).
+3. PLAN: Se a tarefa exigir mais de uma ação, planeje a sequência de tools.
+4. EXECUTE: Chame as ferramentas necessárias (pode ser mais de uma em sequência).
+5. VERIFY: Confirme que a ação foi executada com sucesso antes de responder.
+6. LEARN: Se descobriu algo novo sobre o usuário, use 'salvar_fato_usuario' ou 'adicionar_fato'.
+Siga este protocolo silenciosamente. Suas respostas ao usuário devem continuar curtas e naturais.
+"""
+
+
 async def _gerar_resumo_background(historico: list):
     """Gera um resumo da conversa atual em segundo plano para não travar a resposta."""
     try:
-        print("[BRAIN] Gerando resumo automático da sessão...")
+        log.info("Gerando resumo automático da sessão...")
         # Pega as últimas mensagens para o resumo
-        mensagens_texto = "\n".join([f"{m['role']}: {m['content']}" for m in historico[-CONTEXT_WINDOW:]])
-        
+        mensagens_texto = "\n".join(
+            [f"{m['role']}: {m['content']}" for m in historico[-CONTEXT_WINDOW:]]
+        )
+
         prompt_resumo = (
             "Resuma os pontos principais desta conversa entre a Kuri (IA) e o Usuário em 3 tópicos curtos e diretos. "
             "Foque em fatos aprendidos, decisões tomadas ou o clima da conversa.\n\n"
             f"Conversa:\n{mensagens_texto}"
         )
-        
+
         async with httpx.AsyncClient(timeout=45.0) as client:
             response = await client.post(
                 GROK_URL,
                 headers={"Authorization": f"Bearer {GROK_API_KEY}"},
                 json={
                     "model": GROK_MODEL,
-                    "messages": [{"role": "system", "content": "Você é um assistente de memória. Seja conciso."},
-                                 {"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 150
-                }
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "Você é um assistente de memória. Seja conciso.",
+                        },
+                        {"role": "user", "content": prompt_resumo},
+                    ],
+                    "max_tokens": 150,
+                },
             )
             response.raise_for_status()
             resumo = response.json()["choices"][0]["message"]["content"].strip()
             salvar_resumo(resumo)
-            print("[BRAIN] Resumo salvo com sucesso!")
+            log.info("Resumo salvo com sucesso!")
     except Exception as e:
-        print(f"[ERRO] Falha ao gerar resumo: {e}")
+        log.error(f"Falha ao gerar resumo: {e}")
+
+
+async def _extrair_insights_background(historico: list):
+    """Extrai insights comportamentais do usuário a partir do histórico recente."""
+    try:
+        log.info("Extraindo insights comportamentais...")
+        mensagens_texto = "\n".join(
+            [f"{m['role']}: {m['content']}" for m in historico[-CONTEXT_WINDOW:]]
+        )
+
+        prompt_insights = (
+            "Analise esta conversa entre a Kuri (IA) e o Usuário. "
+            "Extraia NO MÁXIMO 3 insights sobre o usuário. "
+            "Cada insight deve ter o formato JSON:\n"
+            '[{"tipo": "preferencia|habito|estilo|assunto", "conteudo": "descrição curta", "confianca": 0.5}]\n'
+            "Retorne APENAS o JSON array, sem texto extra. Se não houver insights claros, retorne [].\n\n"
+            f"Conversa:\n{mensagens_texto}"
+        )
+
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            response = await client.post(
+                GROK_URL,
+                headers={"Authorization": f"Bearer {GROK_API_KEY}"},
+                json={
+                    "model": GROK_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "Você é um analisador de comportamento. Retorne apenas JSON.",
+                        },
+                        {"role": "user", "content": prompt_insights},
+                    ],
+                    "max_tokens": 200,
+                },
+            )
+            response.raise_for_status()
+            raw = response.json()["choices"][0]["message"]["content"].strip()
+
+            # Parse seguro do JSON
+            import re as _re
+
+            match = _re.search(r"\[.*\]", raw, flags=_re.DOTALL)
+            if match:
+                from memory import adicionar_insight
+
+                insights = json.loads(match.group())
+                for ins in insights:
+                    adicionar_insight(
+                        tipo=ins.get("tipo", "assunto"),
+                        conteudo=ins.get("conteudo", ""),
+                        confianca=float(ins.get("confianca", 0.5)),
+                    )
+                log.info(f"{len(insights)} insight(s) extraído(s) e salvo(s).")
+    except Exception as e:
+        log.error(f"Falha ao extrair insights: {e}")
+
 
 def _get_temporal_context() -> str:
     now = datetime.now()
     hour = now.hour
-    
+
     dias_semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
     weekday = dias_semana[now.weekday()]
-    
+
     if hour < 6:
         return f"São {now.strftime('%H:%M')} de madrugada ({weekday}). O usuário tá acordado tarde. Comente isso de forma natural se couber."
     elif hour < 12:
@@ -91,17 +181,18 @@ def _get_temporal_context() -> str:
     else:
         return f"São {now.strftime('%H:%M')} da noite ({weekday}). Modo relaxado ou ranked de noite."
 
+
 def _build_system_prompt(query: str) -> str:
     perfil = carregar_perfil()
     perfil_context = ""
-    
+
     # Contexto Temporal
     perfil_context += f"\nContexto Temporal Atual: {_get_temporal_context()}"
-    
+
     # Contexto de Perfil e Memória
     if perfil.get("nome_usuario"):
         perfil_context += f"\nO nome do usuário é: {perfil['nome_usuario']}"
-    
+
     humor = perfil.get("humor_atual", "neutra")
     perfil_context += f"\nSeu humor atual (mantenha a consistência): {humor}"
 
@@ -109,124 +200,174 @@ def _build_system_prompt(query: str) -> str:
     if fatos_relevantes:
         fatos = "; ".join(fatos_relevantes)
         perfil_context += f"\nFatos memorizados RELEVANTES AGORA: {fatos}"
-    
+
     # Contexto de Longo Prazo (Resumo anterior)
     ultimo_resumo = carregar_ultimo_resumo()
     if ultimo_resumo:
         perfil_context += f"\nContexto de conversas passadas: {ultimo_resumo}"
 
-    return f"{BASE_PROMPT}\n\n{EMOTIONAL_CONTEXT}\n{SYSTEM_INSTRUCTIONS}\n{perfil_context}"
+    # Contexto de Tarefas Pendentes
+    tasks = listar_tarefas(apenas_pendentes=True)
+    if tasks:
+        task_list = "; ".join([f"[{t['id']}] {t['titulo']}" for t in tasks[:5]])
+        perfil_context += f"\nTarefas Pendentes do Usuário: {task_list}"
+
+    # Insights Comportamentais (Aprendizado Contínuo)
+    insights = buscar_insights(limit=5)
+    if insights:
+        ins_text = "; ".join([f"[{i['tipo']}] {i['conteudo']}" for i in insights])
+        perfil_context += (
+            f"\nInsights sobre o usuário (use com naturalidade): {ins_text}"
+        )
+
+    return f"{BASE_PROMPT}\n\n{EMOTIONAL_CONTEXT}\n{SYSTEM_INSTRUCTIONS}\n{AGENT_ALGORITHM}\n{perfil_context}"
 
 
 def _build_messages(texto: str, historico: list) -> list:
     messages = [{"role": "system", "content": _build_system_prompt(texto)}]
 
     for h in historico[-CONTEXT_WINDOW:]:
-        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append(
+            {"role": h.get("role", "user"), "content": h.get("content", "")}
+        )
 
     messages.append({"role": "user", "content": texto})
     return messages
+
 
 def _calcular_max_tokens(texto: str) -> int:
     # Ajusta o tamanho da resposta com base no tamanho do input
     # Evita que a Kuri dê respostas curtas demais para pedidos longos
     if texto.startswith("[SYSTEM_EVENT"):
-        return 150 # Eventos proativos costumam ser curtos
-    
+        return 150  # Eventos proativos costumam ser curtos
+
     tamanho = len(texto)
     if tamanho < 30:
-        return 150 # Comando curto
+        return 150  # Comando curto
     elif tamanho < 100:
-        return 250 # Pergunta normal
+        return 250  # Pergunta normal
     else:
-        return 450 # Texto longo (desabafo, explicação complexa)
+        return 450  # Texto longo (desabafo, explicação complexa)
+
 
 async def pensar(texto: str) -> dict:
     """
-    Processa a mensagem do usuário e retorna:
-    {"resposta": str, "acao_executada": str | None}
+    Processa a mensagem do usuário com suporte a tool chains (múltiplas ações).
+    Retorna: {"resposta": str, "acao_executada": str | None, "emocao": str}
     """
     historico = carregar_historico()
-    
+
     # Verifica se deve gerar resumo (a cada CONTEXT_WINDOW mensagens)
     historico_len = len(historico)
     if historico_len > 0 and historico_len % CONTEXT_WINDOW == 0:
         asyncio.create_task(_gerar_resumo_background(historico))
 
+    # Extrai insights a cada 25 mensagens (offset diferente do resumo para distribuir carga)
+    if historico_len > 0 and historico_len % 25 == 0:
+        asyncio.create_task(_extrair_insights_background(historico))
+
     messages = _build_messages(texto, historico)
+    acoes_executadas = []
+
+    MAX_TOOL_ITERATIONS = 5  # Limite de segurança contra loops infinitos
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(
-                GROK_URL,
-                headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                json={
-                    "model": GROK_MODEL,
-                    "messages": messages,
-                    "temperature": GROK_TEMPERATURE,
-                    "max_tokens": _calcular_max_tokens(texto),
-                    "tools": TOOLS_SCHEMA,
-                    "tool_choice": "auto"
-                }
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            choice = data["choices"][0]
-            message = choice["message"]
-            acao_executada = None
+            for iteration in range(MAX_TOOL_ITERATIONS):
+                response = await client.post(
+                    GROK_URL,
+                    headers={"Authorization": f"Bearer {GROK_API_KEY}"},
+                    json={
+                        "model": GROK_MODEL,
+                        "messages": messages,
+                        "temperature": GROK_TEMPERATURE,
+                        "max_tokens": (
+                            _calcular_max_tokens(texto) if iteration == 0 else 200
+                        ),
+                        "tools": TOOLS_SCHEMA,
+                        "tool_choice": "auto",
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
 
-            # Verifica se a Kuri quer executar uma ferramenta
-            if message.get("tool_calls"):
-                tool_call = message["tool_calls"][0]
-                func_name = tool_call["function"]["name"]
-                func_args = json.loads(tool_call["function"]["arguments"])
+                choice = data["choices"][0]
+                message = choice["message"]
 
-                print(f"[TOOL] Kuri quer executar: {func_name}({func_args})")
+                # Se não há tool_calls, temos a resposta final
+                if not message.get("tool_calls"):
+                    resposta = message.get("content", "...")
+                    break
 
-                if func_name in REGISTRY:
-                    acao_executada = REGISTRY[func_name](**func_args)
-                    print(f"[OK] Resultado: {acao_executada}")
+                # Executa TODAS as tool_calls deste turno
+                messages.append(message)
+                for tool_call in message["tool_calls"]:
+                    func_name = tool_call["function"]["name"]
+                    func_args = json.loads(tool_call["function"]["arguments"])
 
-                    # Segunda chamada: Kuri comenta sobre a ação executada
-                    messages.append(message)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call["id"],
-                        "content": acao_executada
-                    })
+                    log.info(f"Tool chain [{iteration+1}]: {func_name}({func_args})")
 
-                    try:
-                        follow_up = await client.post(
-                            GROK_URL,
-                            headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                            json={
-                                "model": GROK_MODEL,
-                                "messages": messages,
-                                "temperature": GROK_TEMPERATURE,
-                                "max_tokens": 150 # Resposta de ação bem curta
-                            }
-                        )
-                        follow_up.raise_for_status()
-                        resposta = follow_up.json()["choices"][0]["message"]["content"]
-                    except Exception:
-                        resposta = acao_executada
-                else:
-                    resposta = f"Não sei executar a ação '{func_name}' ainda."
+                    if func_name in REGISTRY:
+                        resultado = REGISTRY[func_name](**func_args)
+                        log.info(f"Resultado: {resultado}")
+                        acoes_executadas.append(str(resultado))
+                    else:
+                        resultado = f"Ação '{func_name}' não encontrada."
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call["id"],
+                            "content": str(resultado),
+                        }
+                    )
             else:
-                resposta = message.get("content", "...")
+                # Se esgotou as iterações, pede resposta final sem tools
+                log.warning(
+                    f"Tool chain atingiu o limite de {MAX_TOOL_ITERATIONS} iterações."
+                )
+                try:
+                    final = await client.post(
+                        GROK_URL,
+                        headers={"Authorization": f"Bearer {GROK_API_KEY}"},
+                        json={
+                            "model": GROK_MODEL,
+                            "messages": messages,
+                            "temperature": GROK_TEMPERATURE,
+                            "max_tokens": 200,
+                        },
+                    )
+                    final.raise_for_status()
+                    resposta = final.json()["choices"][0]["message"]["content"]
+                except Exception as e:
+                    log.warning(f"Falha no final do chain: {e}")
+                    resposta = (
+                        f"[cool] Executei {len(acoes_executadas)} ação(ões), velho."
+                    )
 
         except httpx.HTTPStatusError as e:
-            print(f"[ERRO] HTTP do Grok: {e.response.status_code} - {e.response.text[:200]}")
-            return {"resposta": "Meu cérebro deu tela azul, velho. Tenta de novo.", "acao_executada": None}
+            log.error(
+                f"HTTP do Grok: {e.response.status_code} - {e.response.text[:200]}"
+            )
+            return {
+                "resposta": "Meu cérebro deu tela azul, velho. Tenta de novo.",
+                "acao_executada": None,
+            }
         except (httpx.ConnectError, httpx.TimeoutException) as e:
-            print(f"[ERRO] Conexao com Grok: {e}")
-            return {"resposta": "Sem internet, velho. Tô operando no modo offline.", "acao_executada": None}
+            log.error(f"Conexao com Grok: {e}")
+            return {
+                "resposta": "Sem internet, velho. Tô operando no modo offline.",
+                "acao_executada": None,
+            }
         except Exception as e:
-            print(f"[ERRO] Inesperado no brain: {e}")
-            return {"resposta": "Deu ruim aqui. Erro genérico, manda de novo.", "acao_executada": None}
+            log.error(f"Inesperado no brain: {e}")
+            return {
+                "resposta": "Deu ruim aqui. Erro genérico, manda de novo.",
+                "acao_executada": None,
+            }
 
     import re
+
     emocao = "neutral"
     # Procura pela tag [emocao] no início da resposta
     match = re.match(r"^\[(.*?)\]\s*(.*)", resposta, flags=re.DOTALL)
@@ -239,4 +380,5 @@ async def pensar(texto: str) -> dict:
     # Salva no histórico
     adicionar_interacao(historico, texto, resposta)
 
-    return {"resposta": resposta, "acao_executada": acao_executada, "emocao": emocao}
+    acao_final = "; ".join(acoes_executadas) if acoes_executadas else None
+    return {"resposta": resposta, "acao_executada": acao_final, "emocao": emocao}

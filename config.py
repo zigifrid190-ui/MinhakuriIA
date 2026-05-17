@@ -37,7 +37,7 @@ if KURI_PERF_MODE == "low":
 elif KURI_PERF_MODE == "high":
     WHISPER_MODEL = "small"
     CPU_THREADS = 8
-else: # balanced
+else:  # balanced
     WHISPER_MODEL = "base"
     CPU_THREADS = 4
 
@@ -49,10 +49,10 @@ WHISPER_LANGUAGE = "pt"
 # Banco de dados SQLite para persistência
 KURI_DB = "kuri_memory.db"
 MAX_MEMORY_MESSAGES = 50
-CONTEXT_WINDOW = 20           # últimas N mensagens enviadas para o LLM
+CONTEXT_WINDOW = 20  # últimas N mensagens enviadas para o LLM
 
 # ===== Prompt =====
 PROMPT_FILE = get_resource_path("prompt_kuri.txt")
 
 # ===== System =====
-SILENCE_TIMEOUT = 8.0         # segundos de silêncio antes de "dormir"
+SILENCE_TIMEOUT = 8.0  # segundos de silêncio antes de "dormir"

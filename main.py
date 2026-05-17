@@ -54,7 +54,9 @@ async def loop_hibrido():
 
     while True:
         try:
-            entrada = input("\n>> [Enter = mic | texto + Enter = enviar | 'sair' = sair]: ").strip()
+            entrada = input(
+                "\n>> [Enter = mic | texto + Enter = enviar | 'sair' = sair]: "
+            ).strip()
 
             if entrada.lower() in ("sair", "exit", "quit", "q"):
                 print("\n[KURI] Falou velho, vai la ser produtivo... ou nao.")
@@ -73,8 +75,15 @@ async def loop_hibrido():
                 # Modo microfone
                 texto = ouvir()
                 if not texto:
-                    print("[!] Nao captei nada. Tenta de novo.")
-                    continue
+                    import routines
+
+                    proativo = await routines.check_proactivity()
+                    if proativo:
+                        texto = proativo
+                        print("\n[ROUTINE] Kuri iniciou uma conversa proativa...")
+                    else:
+                        print("[!] Não captei nada. Tenta de novo.")
+                        continue
             else:
                 texto = entrada
 
@@ -89,7 +98,9 @@ async def loop_hibrido():
 
 async def loop_voz():
     """Modo continuo de voz -- fica ouvindo e respondendo sem parar."""
-    print("\n[MIC] Modo voz continuo ativado! Fale a qualquer momento. Diga 'sair' para voltar.\n")
+    print(
+        "\n[MIC] Modo voz continuo ativado! Fale a qualquer momento. Diga 'sair' para voltar.\n"
+    )
 
     while True:
         try:

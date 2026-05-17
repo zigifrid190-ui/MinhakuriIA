@@ -1,12 +1,13 @@
 """
 Diagnostico de microfone v3
 """
+
 import sys
 import io
 import sounddevice as sd
 import numpy as np
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 # 1. Lista dispositivos de input
 print("=" * 60)
@@ -21,7 +22,7 @@ for i, d in enumerate(devices):
 
 try:
     default_dev = sd.default.device
-    if hasattr(default_dev, 'input'):
+    if hasattr(default_dev, "input"):
         default_input = default_dev.input
     elif isinstance(default_dev, (list, tuple)):
         default_input = default_dev[0]
@@ -46,8 +47,10 @@ print("   FALE ALGO AGORA!\n")
 
 try:
     stream = sd.InputStream(
-        samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE,
-        blocksize=int(SAMPLE_RATE * CHUNK)
+        samplerate=SAMPLE_RATE,
+        channels=CHANNELS,
+        dtype=DTYPE,
+        blocksize=int(SAMPLE_RATE * CHUNK),
     )
     stream.start()
 

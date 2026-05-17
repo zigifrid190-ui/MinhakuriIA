@@ -4,7 +4,16 @@ import tempfile
 import wave
 import os
 import threading
-from config import WHISPER_MODEL, WHISPER_DEVICE, WHISPER_COMPUTE, WHISPER_LANGUAGE, CPU_THREADS
+from config import (
+    WHISPER_MODEL,
+    WHISPER_DEVICE,
+    WHISPER_COMPUTE,
+    WHISPER_LANGUAGE,
+    CPU_THREADS,
+)
+from logger import get_logger
+
+log = get_logger("stt")
 
 # Carregamento do modelo
 _model = None
@@ -15,9 +24,9 @@ CHANNELS = 1
 DTYPE = "int16"
 
 # Parâmetros otimizados de detecção
-SILENCE_THRESHOLD = 60        # Fallback fixo
-SILENCE_DURATION = 1.0        # Resposta mais rápida (corta após 1s de silêncio)
-MAX_RECORD_SECONDS = 30       # Limite máximo
+SILENCE_THRESHOLD = 60  # Fallback fixo
+SILENCE_DURATION = 1.0  # Resposta mais rápida (corta após 1s de silêncio)
+MAX_RECORD_SECONDS = 30  # Limite máximo
 
 DYNAMIC_THRESHOLD = SILENCE_THRESHOLD
 
@@ -27,42 +36,54 @@ def _get_model():
     global _model
     with _model_lock:
         if _model is None:
-            print(f"[STT] Inicializando motor de voz Whisper ({WHISPER_MODEL}) no {WHISPER_DEVICE}...")
+            log.info(
+                f"Inicializando motor de voz Whisper ({WHISPER_MODEL}) no {WHISPER_DEVICE}..."
+            )
             from faster_whisper import WhisperModel
+
             _model = WhisperModel(
                 WHISPER_MODEL,
                 device=WHISPER_DEVICE,
                 compute_type=WHISPER_COMPUTE,
-                cpu_threads=CPU_THREADS
+                cpu_threads=CPU_THREADS,
             )
-            print(f"[STT] Motor Whisper pronto! (Threads: {CPU_THREADS}, Compute: {WHISPER_COMPUTE})")
+            log.info(
+                f"Motor Whisper pronto! (Threads: {CPU_THREADS}, Compute: {WHISPER_COMPUTE})"
+            )
     return _model
 
 
 # Pré-carrega o modelo em background ao importar o módulo
 threading.Thread(target=_get_model, daemon=True, name="STTPreloader").start()
 
+
 async def calibrar_microfone(duration=2.0):
     """Grava o som ambiente por X segundos e define o threshold ideal."""
     global DYNAMIC_THRESHOLD
-    print(f"[STT] Calibrando microfone por {duration}s...")
-    
+    log.info(f"Calibrando microfone por {duration}s...")
+
     device_idx = sd.default.device[0]
-    if device_idx == -1: return
+    if device_idx == -1:
+        return
 
     try:
         # Grava o áudio
-        audio = sd.rec(int(duration * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=CHANNELS, dtype=DTYPE)
+        audio = sd.rec(
+            int(duration * SAMPLE_RATE),
+            samplerate=SAMPLE_RATE,
+            channels=CHANNELS,
+            dtype=DTYPE,
+        )
         sd.wait()
-        
+
         # Calcula a média da amplitude
         amplitude_media = np.abs(audio).mean()
         # Define threshold como a média + margem de segurança (multiplicador)
         # Se for muito baixo (silêncio absoluto), usa o fallback de 60
         DYNAMIC_THRESHOLD = max(SILENCE_THRESHOLD, int(amplitude_media * 1.8))
-        print(f"[STT] Calibração concluída. Novo SILENCE_THRESHOLD: {DYNAMIC_THRESHOLD}")
+        log.info(f"Calibração concluída. Novo SILENCE_THRESHOLD: {DYNAMIC_THRESHOLD}")
     except Exception as e:
-        print(f"[ERRO] Calibração falhou: {e}")
+        log.error(f"Calibração falhou: {e}")
         DYNAMIC_THRESHOLD = SILENCE_THRESHOLD
 
 
@@ -84,32 +105,32 @@ def gravar_audio() -> str | None:
             if d["max_input_channels"] > 0:
                 device_idx = i
                 break
-    
+
     try:
         try:
             stream = sd.InputStream(
                 device=device_idx,
-                samplerate=SAMPLE_RATE, 
-                channels=CHANNELS, 
-                dtype=DTYPE, 
-                blocksize=chunk_size
+                samplerate=SAMPLE_RATE,
+                channels=CHANNELS,
+                dtype=DTYPE,
+                blocksize=chunk_size,
             )
             stream.start()
         except Exception:
             # Fallback para 2 canais
-            print(f"[STT] Tentando device {device_idx} com 2 canais...")
+            log.debug(f"Tentando device {device_idx} com 2 canais...")
             stream = sd.InputStream(
                 device=device_idx,
-                samplerate=SAMPLE_RATE, 
-                channels=2, 
-                dtype=DTYPE, 
-                blocksize=chunk_size
+                samplerate=SAMPLE_RATE,
+                channels=2,
+                dtype=DTYPE,
+                blocksize=chunk_size,
             )
             stream.start()
 
         for _ in range(max_chunks):
             data, _ = stream.read(chunk_size)
-            
+
             # Se tiver mais de 1 canal, pega apenas o primeiro
             if data.ndim > 1 and data.shape[1] > 1:
                 data_proc = data[:, 0]
@@ -132,7 +153,7 @@ def gravar_audio() -> str | None:
         stream.close()
 
     except Exception as e:
-        print(f"[ERRO] Gravação: {e}")
+        log.error(f"Gravação: {e}")
         return None
 
     if not frames or not started_speaking:
@@ -160,13 +181,14 @@ def transcrever(audio_path: str) -> str:
         segments, _ = model.transcribe(
             audio_path,
             language=WHISPER_LANGUAGE,
-            beam_size=1,
+            beam_size=5,  # Aumentado de 1 para 5 para maior precisão (busca em feixe)
             vad_filter=True,  # Pula ruídos e foca na fala
-            vad_parameters=dict(min_silence_duration_ms=500)
+            vad_parameters=dict(min_silence_duration_ms=500),
+            initial_prompt="Isso é uma conversa com a Kuri, uma assistente pessoal sarcástica e gamer em português.",  # Ajuda no contexto e pontuação
         )
         return " ".join([s.text for s in segments]).strip()
     except Exception as e:
-        print(f"[ERRO] Transcrição: {e}")
+        log.error(f"Transcrição: {e}")
         return ""
     finally:
         try:
