@@ -164,6 +164,59 @@ async def _extrair_insights_background(historico: list):
         log.error(f"Falha ao extrair insights: {e}")
 
 
+async def _auto_avaliar_kuri_background(historico: list):
+    """Realiza uma auto-avaliação autônoma do desempenho e do tom da Kuri."""
+    try:
+        log.info("Iniciando auto-avaliação comportamental da Kuri...")
+        mensagens_texto = "\n".join(
+            [f"{m['role']}: {m['content']}" for m in historico[-50:]]
+        )
+
+        prompt_avaliacao = (
+            "Analise as últimas 50 interações da Kuri (IA) com o Usuário para auto-avaliação.\n"
+            "Avalie o nível de satisfação do usuário, a eficácia do tom adotado pela Kuri, "
+            "e identifique se há áreas de contradição, inconsistências ou oportunidades de melhoria comportamental.\n"
+            "Gere uma resposta em formato JSON rígido seguindo este schema:\n"
+            "{\n"
+            '  "satisfacao_usuario": "alta | media | baixa",\n'
+            '  "perfil_psicologico_usuario": "análise curta dos traços psicológicos revelados nesta sessão",\n'
+            '  "sugestao_ajuste_humor_kuri": "sugestão de humor predominante (ex: sarcástica, empática, séria, focada)",\n'
+            '  "pontos_melhoria": ["ponto 1", "ponto 2"]\n'
+            "}\n"
+            "Retorne APENAS o objeto JSON. Não coloque markdown block como ```json ou qualquer texto extra.\n\n"
+            f"Histórico das conversas:\n{mensagens_texto}"
+        )
+
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            response = await client.post(
+                GROK_URL,
+                headers={"Authorization": f"Bearer {GROK_API_KEY}"},
+                json={
+                    "model": GROK_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "Você é um auditor de inteligência artificial focado em avaliar alinhamento e consistência comportamental.",
+                        },
+                        {"role": "user", "content": prompt_avaliacao},
+                    ],
+                    "max_tokens": 400,
+                },
+            )
+            response.raise_for_status()
+            raw = response.json()["choices"][0]["message"]["content"].strip()
+
+            import re as _re
+            match = _re.search(r"\{.*\}", raw, flags=_re.DOTALL)
+            if match:
+                from memory import atualizar_perfil
+                avaliacao_json = match.group()
+                atualizar_perfil("auto_avaliacao_recente", avaliacao_json)
+                log.info("Auto-avaliação autônoma realizada e salva no perfil com sucesso.")
+    except Exception as e:
+        log.error(f"Falha ao realizar auto-avaliação comportamental: {e}")
+
+
 def _get_temporal_context() -> str:
     now = datetime.now()
     hour = now.hour
@@ -219,6 +272,20 @@ def _build_system_prompt(query: str) -> str:
             f"\nInsights sobre o usuário (use com naturalidade): {ins_text}"
         )
 
+    # Auto-avaliação e Ajuste de Tom Emocional
+    auto_eval = perfil.get("auto_avaliacao_recente")
+    if auto_eval:
+        try:
+            eval_data = json.loads(auto_eval)
+            sugestao = eval_data.get("sugestao_ajuste_humor_kuri")
+            melhorias = ", ".join(eval_data.get("pontos_melhoria", []))
+            if sugestao:
+                perfil_context += f"\n[Auto-análise Comportamental]: A partir da sua última auto-avaliação, tente adotar um tom mais '{sugestao}' nas interações."
+            if melhorias:
+                perfil_context += f" Atente para estes pontos de melhoria: {melhorias}."
+        except Exception:
+            pass
+
     return f"{BASE_PROMPT}\n\n{EMOTIONAL_CONTEXT}\n{SYSTEM_INSTRUCTIONS}\n{AGENT_ALGORITHM}\n{perfil_context}"
 
 
@@ -264,6 +331,10 @@ async def pensar(texto: str) -> dict:
     # Extrai insights a cada 25 mensagens (offset diferente do resumo para distribuir carga)
     if historico_len > 0 and historico_len % 25 == 0:
         asyncio.create_task(_extrair_insights_background(historico))
+
+    # Auto-avaliação da Kuri a cada 50 mensagens
+    if historico_len > 0 and historico_len % 50 == 0:
+        asyncio.create_task(_auto_avaliar_kuri_background(historico))
 
     messages = _build_messages(texto, historico)
     acoes_executadas = []
