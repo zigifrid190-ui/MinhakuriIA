@@ -1034,7 +1034,7 @@ class UXAuditor:
             dirs[:] = [
                 d
                 for d in dirs
-                if d not in {"node_modules", ".git", "dist", "build", ".next"}
+                if d not in {"node_modules", ".git", "dist", "build", ".next", "venv", ".venv", "DESIGN-SYSTEMS"}
             ]
             for file in files:
                 if Path(file).suffix in extensions:

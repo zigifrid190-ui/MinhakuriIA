@@ -88,6 +88,26 @@ async def _kuri_voice_loop():
                 await asyncio.sleep(0.1)
                 continue
 
+        # ── Wake Word Filter ───────────────────────────────────────────────
+        # Limpa pontuação para facilitar a busca
+        import re
+        texto_limpo = re.sub(r'[^a-z0-9\s]', '', texto.lower().strip())
+        palavras = texto_limpo.split()
+        
+        is_wake_word = False
+        if palavras:
+            # Permite "Oi Kuri", "Ah Kuri", etc. checando as primeiras 3 palavras
+            if any(w in ["kuri", "curi", "curie"] for w in palavras[:3]):
+                is_wake_word = True
+
+        if not is_wake_word and not getattr(texto, "is_proactive", False):
+            # Se for texto proativo (via routine), deixamos passar.
+            # Como string não tem attr, usamos a origem
+            if texto != proativo if 'proativo' in locals() else True:
+                log.info(f"Wake word ausente. Ignorando: '{texto}'")
+                bridge.set_state(KuriState.IDLE)
+                continue
+
         # ── Pensar ─────────────────────────────────────────────────────────
         bridge.set_state(KuriState.THINKING)
         try:

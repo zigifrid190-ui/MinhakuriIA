@@ -5,7 +5,6 @@ from config import (
     GROK_API_KEY,
     GROK_MODEL,
     GROK_TEMPERATURE,
-    GROK_MAX_TOKENS,
     GROK_URL,
     PROMPT_FILE,
     CONTEXT_WINDOW,

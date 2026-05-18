@@ -6,7 +6,7 @@ Usa um banco de dados temporário em memória para isolamento total.
 import unittest
 import os
 import tempfile
-from unittest.mock import patch
+
 
 
 class TestMemoryManager(unittest.TestCase):

@@ -77,6 +77,17 @@ class MemoryManager:
                     UNIQUE(tipo, conteudo)
                 )
             """)
+
+            # Tabela de Histórico de Ações Executadas (Hooks)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS historico_acoes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nome_acao TEXT NOT NULL,
+                    argumentos TEXT,
+                    resultado TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     # --- Histórico ---
@@ -362,6 +373,23 @@ class MemoryManager:
             log.error(f"listar_insights: {e}")
             return []
 
+    # --- Histórico de Ações (Hooks) ---
+    def adicionar_historico_acao(self, nome_acao: str, argumentos: Any, resultado: str) -> bool:
+        """Salva a execução de uma ferramenta (action) e seu resultado no banco."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                args_str = json.dumps(argumentos, ensure_ascii=False) if argumentos else "{}"
+                cursor.execute(
+                    "INSERT INTO historico_acoes (nome_acao, argumentos, resultado) VALUES (?, ?, ?)",
+                    (nome_acao, args_str, str(resultado)),
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            log.error(f"adicionar_historico_acao: {e}")
+            return False
+
 
 # Instância única para uso global
 memory = MemoryManager()
@@ -429,3 +457,7 @@ def buscar_insights(limit: int = 10):
 
 def listar_insights(tipo: str = None):
     return memory.listar_insights(tipo)
+
+
+def adicionar_historico_acao(nome_acao: str, argumentos: Any, resultado: str):
+    return memory.adicionar_historico_acao(nome_acao, argumentos, resultado)

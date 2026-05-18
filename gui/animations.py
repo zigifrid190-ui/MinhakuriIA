@@ -5,8 +5,6 @@ animations.py — Helpers para animações Qt na interface da Kuri.
 from PyQt6.QtCore import (
     QPropertyAnimation,
     QEasingCurve,
-    QSequentialAnimationGroup,
-    QParallelAnimationGroup,
 )
 from PyQt6.QtWidgets import QGraphicsOpacityEffect
 

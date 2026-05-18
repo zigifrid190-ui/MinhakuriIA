@@ -64,7 +64,11 @@ def detect_project_type(project_path: Path) -> dict:
         result["type"] = "python"
 
         # Check for ruff
-        result["linters"].append({"name": "ruff", "cmd": ["ruff", "check", "."]})
+        ruff_cmd = "ruff"
+        venv_ruff = project_path / "venv" / "Scripts" / "ruff.exe"
+        if venv_ruff.exists():
+            ruff_cmd = str(venv_ruff)
+        result["linters"].append({"name": "ruff", "cmd": [ruff_cmd, "check", "."]})
 
         # Check for mypy
         if (project_path / "mypy.ini").exists() or (

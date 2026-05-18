@@ -4,6 +4,7 @@ import tempfile
 import wave
 import os
 import threading
+import torch
 from config import (
     WHISPER_MODEL,
     WHISPER_DEVICE,
@@ -15,9 +16,13 @@ from logger import get_logger
 
 log = get_logger("stt")
 
-# Carregamento do modelo
+# Carregamento do modelo Whisper
 _model = None
 _model_lock = threading.Lock()
+
+# Carregamento do modelo Silero VAD
+_vad_model = None
+_vad_lock = threading.Lock()
 
 SAMPLE_RATE = 16000
 CHANNELS = 1
@@ -52,9 +57,56 @@ def _get_model():
             )
     return _model
 
+def _get_vad_model():
+    """Carrega o modelo Silero VAD de forma thread-safe."""
+    global _vad_model
+    with _vad_lock:
+        if _vad_model is None:
+            log.info("Inicializando filtro de voz inteligente (Silero VAD)...")
+            try:
+                # Carrega silenciosamente o VAD local
+                _vad_model, _ = torch.hub.load(
+                    repo_or_dir='snakers4/silero-vad', 
+                    model='silero_vad',
+                    trust_repo=True
+                )
+                log.info("Silero VAD carregado com sucesso!")
+            except Exception as e:
+                log.error(f"Erro ao carregar Silero VAD: {e}")
+    return _vad_model
 
-# Pré-carrega o modelo em background ao importar o módulo
+
+# Pré-carrega os modelos em background ao importar o módulo
 threading.Thread(target=_get_model, daemon=True, name="STTPreloader").start()
+threading.Thread(target=_get_vad_model, daemon=True, name="VADPreloader").start()
+
+
+def _get_input_device_idx() -> int:
+    """Retorna o índice do dispositivo de gravação (prioriza Bluetooth/Headsets)."""
+    try:
+        devices = sd.query_devices()
+        keywords = ["jbl", "headset", "bluetooth", "hands-free"]
+        
+        # 1. Tenta Bluetooth / Headsets
+        for i, d in enumerate(devices):
+            if d["max_input_channels"] > 0:
+                if any(k in d["name"].lower() for k in keywords):
+                    log.info(f"Microfone Bluetooth/Headset selecionado: {d['name']} (ID {i})")
+                    return i
+                    
+        # 2. Tenta Padrão do Sistema
+        default_idx = sd.default.device[0]
+        if default_idx != -1:
+            return default_idx
+            
+        # 3. Fallback para o primeiro válido
+        for i, d in enumerate(devices):
+            if d["max_input_channels"] > 0:
+                return i
+    except Exception as e:
+        log.error(f"Erro ao buscar dispositivos de áudio: {e}")
+        
+    return sd.default.device[0]
 
 
 async def calibrar_microfone(duration=2.0):
@@ -62,49 +114,41 @@ async def calibrar_microfone(duration=2.0):
     global DYNAMIC_THRESHOLD
     log.info(f"Calibrando microfone por {duration}s...")
 
-    device_idx = sd.default.device[0]
+    device_idx = _get_input_device_idx()
     if device_idx == -1:
         return
 
     try:
         # Grava o áudio
-        audio = sd.rec(
+        sd.rec(
             int(duration * SAMPLE_RATE),
             samplerate=SAMPLE_RATE,
             channels=CHANNELS,
             dtype=DTYPE,
         )
         sd.wait()
-
-        # Calcula a média da amplitude
-        amplitude_media = np.abs(audio).mean()
-        # Define threshold como a média + margem de segurança (multiplicador)
-        # Se for muito baixo (silêncio absoluto), usa o fallback de 60
-        DYNAMIC_THRESHOLD = max(SILENCE_THRESHOLD, int(amplitude_media * 1.8))
-        log.info(f"Calibração concluída. Novo SILENCE_THRESHOLD: {DYNAMIC_THRESHOLD}")
+        log.info("Calibração concluída. (Amplitude descartada, VAD neural ativo!)")
     except Exception as e:
         log.error(f"Calibração falhou: {e}")
-        DYNAMIC_THRESHOLD = SILENCE_THRESHOLD
 
 
 def gravar_audio() -> str | None:
-    """Grava áudio do microfone até detectar silêncio. Retorna path do arquivo WAV."""
+    """Grava áudio do microfone até detectar silêncio usando Silero VAD. Retorna path do arquivo WAV."""
     frames = []
     silent_chunks = 0
-    chunk_duration = 0.1  # 100ms por chunk
-    chunk_size = int(SAMPLE_RATE * chunk_duration)
+    # Silero VAD funciona perfeitamente com chunks de 512 samples a 16kHz (32ms)
+    chunk_size = 512
+    chunk_duration = chunk_size / SAMPLE_RATE
     max_chunks = int(MAX_RECORD_SECONDS / chunk_duration)
     silence_chunks_needed = int(SILENCE_DURATION / chunk_duration)
     started_speaking = False
 
-    # Verifica se há um device padrão válido, senão procura o primeiro disponível
-    device_idx = sd.default.device[0]
+    device_idx = _get_input_device_idx()
     if device_idx == -1:
-        devices = sd.query_devices()
-        for i, d in enumerate(devices):
-            if d["max_input_channels"] > 0:
-                device_idx = i
-                break
+        log.error("Nenhum dispositivo de microfone válido encontrado!")
+        return None
+
+    vad_model = _get_vad_model()
 
     try:
         try:
@@ -137,9 +181,20 @@ def gravar_audio() -> str | None:
             else:
                 data_proc = data.flatten()
 
-            amplitude = np.abs(data_proc).mean()
+            # Converter de int16 para float32 no range [-1.0, 1.0] para o VAD
+            data_float = data_proc.astype(np.float32) / 32768.0
+            
+            is_speech = False
+            if vad_model is not None:
+                tensor_chunk = torch.from_numpy(data_float)
+                prob = vad_model(tensor_chunk, SAMPLE_RATE).item()
+                is_speech = prob > 0.5
+            else:
+                # Fallback de amplitude se VAD falhar em carregar
+                amplitude = np.abs(data_proc).mean()
+                is_speech = amplitude > DYNAMIC_THRESHOLD
 
-            if amplitude > DYNAMIC_THRESHOLD:
+            if is_speech:
                 started_speaking = True
                 silent_chunks = 0
                 frames.append(data_proc.copy())

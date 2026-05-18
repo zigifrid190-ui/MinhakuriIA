@@ -4,7 +4,7 @@ Usa mocks para evitar efeitos colaterais reais no sistema.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestActionsRegistry(unittest.TestCase):

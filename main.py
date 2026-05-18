@@ -24,6 +24,18 @@ MODO_VOZ = "voz"
 MODO_TEXTO = "texto"
 MODO_HIBRIDO = "hibrido"
 
+def _is_wake_word(texto: str) -> bool:
+    """Verifica se o texto contém a wake word (Kuri) no início."""
+    if not texto:
+        return False
+    import re
+    texto_limpo = re.sub(r'[^a-z0-9\s]', '', texto.lower().strip())
+    palavras = texto_limpo.split()
+    if palavras:
+        if any(w in ["kuri", "curi", "curie"] for w in palavras[:3]):
+            return True
+    return False
+
 
 async def processar_mensagem(texto: str):
     """Envia texto para o cerebro da Kuri e reproduz a resposta."""
@@ -84,6 +96,10 @@ async def loop_hibrido():
                     else:
                         print("[!] Não captei nada. Tenta de novo.")
                         continue
+                else:
+                    if not _is_wake_word(texto):
+                        print(f"[WAKE WORD] Ignorado (não chamou a Kuri): '{texto}'")
+                        continue
             else:
                 texto = entrada
 
@@ -106,6 +122,11 @@ async def loop_voz():
         try:
             texto = ouvir()
             if not texto:
+                continue
+
+            if not _is_wake_word(texto):
+                # No modo voz contínuo também filtramos
+                print(f"[WAKE WORD] Ignorado: '{texto}'")
                 continue
 
             if texto.lower().strip() in ("sair", "exit", "parar", "para"):

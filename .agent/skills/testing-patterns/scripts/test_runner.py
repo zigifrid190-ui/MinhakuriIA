@@ -67,9 +67,15 @@ def detect_test_framework(project_path: Path) -> dict:
     ).exists():
         result["type"] = "python"
         result["framework"] = "pytest"
-        result["cmd"] = ["python", "-m", "pytest", "-v"]
+        
+        py_cmd = "python"
+        venv_python = project_path / "venv" / "Scripts" / "python.exe"
+        if venv_python.exists():
+            py_cmd = str(venv_python)
+
+        result["cmd"] = [py_cmd, "-m", "pytest", "-v"]
         result["coverage_cmd"] = [
-            "python",
+            py_cmd,
             "-m",
             "pytest",
             "--cov",
@@ -101,29 +107,53 @@ def run_tests(cmd: list, cwd: Path) -> dict:
             timeout=300,  # 5 min timeout for tests
         )
 
-        result["output"] = proc.stdout[:3000] if proc.stdout else ""
-        result["error"] = proc.stderr[:500] if proc.stderr else ""
-        result["passed"] = proc.returncode == 0
-
-        # Try to parse test counts from output
         output = proc.stdout or ""
+        stderr = proc.stderr or ""
 
-        # Jest/Vitest pattern: "Tests: X passed, Y failed, Z total"
-        if "passed" in output.lower() and "failed" in output.lower():
+        # Fallback inteligente para unittest caso pytest não esteja instalado ou não encontre testes
+        if proc.returncode != 0 and ("No module named pytest" in stderr or "No module named pytest" in output or "no tests ran" in output or proc.returncode == 5):
+            print("\n⚠️  Pytest não encontrou testes ou não está disponível. Usando fallback para o módulo standard 'unittest'...")
+            fallback_cmd = [cmd[0], "-m", "unittest", "discover", "tests"]
+            proc = subprocess.run(
+                fallback_cmd,
+                cwd=str(cwd),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+            )
+            output = proc.stdout or ""
+            stderr = proc.stderr or ""
+            result["passed"] = proc.returncode == 0
+            
+            # Conta testes executados pelo unittest (ex: "Ran 36 tests in X.XXs")
             import re
-
-            match = re.search(r"(\d+)\s+passed", output, re.IGNORECASE)
+            match = re.search(r"Ran\s+(\d+)\s+test", stderr)
             if match:
-                result["tests_passed"] = int(match.group(1))
-            match = re.search(r"(\d+)\s+failed", output, re.IGNORECASE)
-            if match:
-                result["tests_failed"] = int(match.group(1))
-            result["tests_run"] = result["tests_passed"] + result["tests_failed"]
+                result["tests_run"] = int(match.group(1))
+                if "OK" in stderr:
+                    result["tests_passed"] = result["tests_run"]
+                else:
+                    # Encontra quantidade de falhas/erros
+                    failures = 0
+                    match_fail = re.search(r"FAILED\s+\((?:failures=(\d+))?,?\s*(?:errors=(\d+))?\)", stderr)
+                    if match_fail:
+                        f_count = match_fail.group(1)
+                        e_count = match_fail.group(2)
+                        failures = (int(f_count) if f_count else 0) + (int(e_count) if e_count else 0)
+                    result["tests_failed"] = failures
+                    result["tests_passed"] = result["tests_run"] - failures
 
-        # Pytest pattern: "X passed, Y failed"
-        if "pytest" in str(cmd):
+        else:
+            result["passed"] = proc.returncode == 0
+
+        result["output"] = output[:3000]
+        result["error"] = stderr[:500]
+
+        # Try to parse test counts from output (Se usou pytest)
+        if "pytest" in str(cmd) and not result["tests_run"]:
             import re
-
             match = re.search(r"(\d+)\s+passed", output)
             if match:
                 result["tests_passed"] = int(match.group(1))

@@ -7,9 +7,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QFrame,
-    QSizePolicy,
     QApplication,
-    QScrollArea,
 )
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -18,7 +16,7 @@ from PyQt6.QtCore import Qt, QUrl, QTimer, QPoint, pyqtSignal, QObject
 from gui.kuri_bridge import KuriState, bridge
 from gui.settings_dialog import SettingsDialog, load_gui_config, save_gui_config
 from gui.design_system import DesignTokens
-from gui.animations import fade_in, smooth_resize
+from gui.animations import smooth_resize
 from path_utils import get_resource_path
 
 # ── Paths dos avatares ────────────────────────────────────────────────────────

@@ -1,0 +1,14 @@
+# Configuração do Ruff Linter para o projeto Kuri IA
+extend-exclude = [
+    ".agent",
+    "venv",
+    ".vscode",
+    "build",
+    "dist",
+    ".pytest_cache",
+    ".ruff_cache",
+    "DESIGN-SYSTEMS"
+]
+
+line-length = 120
+target-version = "py310"

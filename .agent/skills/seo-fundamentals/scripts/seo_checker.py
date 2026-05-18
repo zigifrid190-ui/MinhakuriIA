@@ -50,6 +50,9 @@ SKIP_DIRS = {
     "docs",
     "documentation",
     "examples",
+    "venv",
+    ".venv",
+    "DESIGN-SYSTEMS",
 }
 
 # Files to skip (not pages)

@@ -16,7 +16,8 @@ A Kuri evoluiu de um simples chatbot para uma aplicação desktop nativa ultrarr
 - **🎙️ Ciclo de Voz Otimizado:** Transcrição instantânea via `faster-whisper` (local-first com filtro VAD e detecção de silêncio de 1.0s) garantindo que seus dados de áudio não sejam enviados para a nuvem.
 - **🔊 Voz Premium com Cache:** Integração nativa com a voz profissional da **ElevenLabs** (com sistema de cache local em `tts_cache/` para economizar créditos) e fallback automático para `edge-tts` gratuito.
 - **🧠 Cérebro Inteligente (Brain):** Conectada ao Grok-4 (xAI) com **Function Calling**, permitindo à Kuri decidir autonomamente quando conversar ou quando executar comandos no seu PC.
-- **🖥️ Controle do Sistema:** Possui 8 ações nativas cadastradas para abrir/fechar apps, fazer pesquisas na web, consultar hora/data, criar/abrir pastas do sistema, tirar prints e controlar o volume do Windows em tempo real.
+- **🖥️ Controle do Sistema:** Possui ações nativas cadastradas para abrir/fechar apps, fazer pesquisas na web, consultar hora/data, criar/abrir pastas do sistema, tirar prints e controlar o volume do Windows em tempo real.
+- **🔌 Framework de Skills Dinâmicas & Hooks (NOVO):** Arquitetura totalmente desacoplada sob `kuri_skills/` permitindo carregar, atualizar e adicionar novas habilidades (ações) em tempo de execução via comando de voz (`recarregar_skills`). Possui ganchos (Hooks) integrados para logar e persistir cada ação de forma auditável no SQLite para aprendizado contínuo.
 - **✨ Interface Viva (Gamer HUD):** Janela flutuante desenvolvida em **PyQt6** com avatares que reagem dinamicamente a 5 estados emocionais mapeados pelo LLM.
 - **🧠 Upgrades Cognitivos (NOVO):**
     - **Consciência Temporal:** Ela agora entende o momento do dia (manhã, tarde, noite, madrugada) e adapta seu comportamento.
@@ -76,9 +77,9 @@ Para ver todos os detalhes técnicos, tarefas e checklists de cada etapa, consul
 ### Resumo dos Sprints:
 - **Sprint 1: Performance e Voz** — ✅ CONCLUÍDO. Integração ElevenLabs, cache local e latência otimizada.
 - **Sprint 2: Inteligência e Memória** — ✅ CONCLUÍDO. SQLite, resumos automáticos, busca por relevância, calibração de microfone e aprendizado ativo de perfil.
-- **Sprint 3: Visual Premium e Rotinas** — 🟡 EM PROGRESSO. Redesign da interface (gradientes, glow, modo compacto) e motor de rotinas iniciado.
-- **Sprint 4: Inteligência Autônoma** — Implementação do **The Algorithm (7 Fases)** do PAI (`OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN`), loop de auto-melhoria contínua e encadeamento de múltiplas ações.
-- **Sprint 5: Integrações Externas** — Módulos modulares de monitoramento proativo de redes sociais (YouTube, Twitter/X, Reddit, Discord) e apoio integrado a projetos de código (Git status, resumos de repositórios).
+- **Sprint 3: Visual Premium e Rotinas** — ✅ CONCLUÍDO. Redesign completo (gradientes, glow, modo compacto) e motor de rotinas proativo 100% ativo.
+- **Sprint 4: Inteligência Autônoma** — ✅ CONCLUÍDO. Implementação do algoritmo PAI completo (`OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN`), loop de auto-melhoria contínua, encadeamento de múltiplas ações (tool chains), metaprogramação e suíte de testes de resiliência integrada (36 testes).
+- **Sprint 5: Integrações Externas** — 🟡 EM PROGRESSO. Módulos de apoio a projetos do Antigravity (Git status, commits) e monitoramento social proativo.
 - **Sprint 6: Jarvis Completo** — Fallback offline-first nativo via **Ollama** (Llama 3 / Qwen 2.5) em caso de queda de internet, visão computacional da tela e **Área de Trabalho Remota** segura (FastAPI + WebSockets + 2FA) para controlar o PC via smartphone.
 
 ---
