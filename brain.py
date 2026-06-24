@@ -1,6 +1,7 @@
 import json
 import httpx
 import asyncio
+import time
 from config import (
     GROK_API_KEY,
     GROK_MODEL,
@@ -8,6 +9,10 @@ from config import (
     GROK_URL,
     PROMPT_FILE,
     CONTEXT_WINDOW,
+    OLLAMA_ENABLED,
+    OLLAMA_URL,
+    OLLAMA_MODEL,
+    OLLAMA_API_URL,
 )
 from memory import (
     carregar_historico,
@@ -22,6 +27,9 @@ from memory import (
 from actions import TOOLS_SCHEMA, REGISTRY
 from datetime import datetime
 from logger import get_logger
+
+# Módulo extraído (Fase 1 - Estabilização)
+
 
 log = get_logger("brain")
 
@@ -68,6 +76,15 @@ PROTOCOLO DE RACIOCÍNIO (siga internamente, NÃO exponha ao usuário):
 6. LEARN: Se descobriu algo novo sobre o usuário, use 'salvar_fato_usuario' ou 'adicionar_fato'.
 Siga este protocolo silenciosamente. Suas respostas ao usuário devem continuar curtas e naturais.
 """
+
+# ===== Cache TTL do System Prompt =====
+_prompt_cache = {"prompt": None, "query": None, "ts": 0}
+_PROMPT_CACHE_TTL = 5.0  # segundos
+
+# ===== Ollama Status Tracking =====
+_ollama_available = None  # None = não verificado, True/False = resultado
+_ollama_last_check = 0
+_OLLAMA_CHECK_INTERVAL = 60.0  # re-verificar a cada 60s
 
 
 async def _gerar_resumo_background(historico: list):
@@ -217,104 +234,9 @@ async def _auto_avaliar_kuri_background(historico: list):
         log.error(f"Falha ao realizar auto-avaliação comportamental: {e}")
 
 
-def _get_temporal_context() -> str:
-    now = datetime.now()
-    hour = now.hour
-
-    dias_semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
-    weekday = dias_semana[now.weekday()]
-
-    if hour < 6:
-        return f"São {now.strftime('%H:%M')} de madrugada ({weekday}). O usuário tá acordado tarde. Comente isso de forma natural se couber."
-    elif hour < 12:
-        return f"São {now.strftime('%H:%M')} da manhã ({weekday}). Bom dia, energia matinal."
-    elif hour < 18:
-        return f"São {now.strftime('%H:%M')} da tarde ({weekday}). Modo produtivo."
-    else:
-        return f"São {now.strftime('%H:%M')} da noite ({weekday}). Modo relaxado ou ranked de noite."
-
-
-def _build_system_prompt(query: str) -> str:
-    perfil = carregar_perfil()
-    perfil_context = ""
-
-    # Contexto Temporal
-    perfil_context += f"\nContexto Temporal Atual: {_get_temporal_context()}"
-
-    # Contexto de Perfil e Memória
-    if perfil.get("nome_usuario"):
-        perfil_context += f"\nO nome do usuário é: {perfil['nome_usuario']}"
-
-    humor = perfil.get("humor_atual", "neutra")
-    perfil_context += f"\nSeu humor atual (mantenha a consistência): {humor}"
-
-    fatos_relevantes = buscar_fatos_relevantes(query)
-    if fatos_relevantes:
-        fatos = "; ".join(fatos_relevantes)
-        perfil_context += f"\nFatos memorizados RELEVANTES AGORA: {fatos}"
-
-    # Contexto de Longo Prazo (Resumo anterior)
-    ultimo_resumo = carregar_ultimo_resumo()
-    if ultimo_resumo:
-        perfil_context += f"\nContexto de conversas passadas: {ultimo_resumo}"
-
-    # Contexto de Tarefas Pendentes
-    tasks = listar_tarefas(apenas_pendentes=True)
-    if tasks:
-        task_list = "; ".join([f"[{t['id']}] {t['titulo']}" for t in tasks[:5]])
-        perfil_context += f"\nTarefas Pendentes do Usuário: {task_list}"
-
-    # Insights Comportamentais (Aprendizado Contínuo)
-    insights = buscar_insights(limit=5)
-    if insights:
-        ins_text = "; ".join([f"[{i['tipo']}] {i['conteudo']}" for i in insights])
-        perfil_context += (
-            f"\nInsights sobre o usuário (use com naturalidade): {ins_text}"
-        )
-
-    # Auto-avaliação e Ajuste de Tom Emocional
-    auto_eval = perfil.get("auto_avaliacao_recente")
-    if auto_eval:
-        try:
-            eval_data = json.loads(auto_eval)
-            sugestao = eval_data.get("sugestao_ajuste_humor_kuri")
-            melhorias = ", ".join(eval_data.get("pontos_melhoria", []))
-            if sugestao:
-                perfil_context += f"\n[Auto-análise Comportamental]: A partir da sua última auto-avaliação, tente adotar um tom mais '{sugestao}' nas interações."
-            if melhorias:
-                perfil_context += f" Atente para estes pontos de melhoria: {melhorias}."
-        except Exception:
-            pass
-
-    return f"{BASE_PROMPT}\n\n{EMOTIONAL_CONTEXT}\n{SYSTEM_INSTRUCTIONS}\n{AGENT_ALGORITHM}\n{perfil_context}"
-
-
-def _build_messages(texto: str, historico: list) -> list:
-    messages = [{"role": "system", "content": _build_system_prompt(texto)}]
-
-    for h in historico[-CONTEXT_WINDOW:]:
-        messages.append(
-            {"role": h.get("role", "user"), "content": h.get("content", "")}
-        )
-
-    messages.append({"role": "user", "content": texto})
-    return messages
-
-
-def _calcular_max_tokens(texto: str) -> int:
-    # Ajusta o tamanho da resposta com base no tamanho do input
-    # Evita que a Kuri dê respostas curtas demais para pedidos longos
-    if texto.startswith("[SYSTEM_EVENT"):
-        return 150  # Eventos proativos costumam ser curtos
-
-    tamanho = len(texto)
-    if tamanho < 30:
-        return 150  # Comando curto
-    elif tamanho < 100:
-        return 250  # Pergunta normal
-    else:
-        return 450  # Texto longo (desabafo, explicação complexa)
-
+# Funções de prompt agora estão em prompt_builder.py (extraídas na Fase 1)
+# Mantemos apenas os aliases para compatibilidade durante a transição
+from prompt_builder import _build_system_prompt, _build_messages, _calcular_max_tokens
 
 async def pensar(texto: str) -> dict:
     """
@@ -336,7 +258,14 @@ async def pensar(texto: str) -> dict:
     if historico_len > 0 and historico_len % 50 == 0:
         asyncio.create_task(_auto_avaliar_kuri_background(historico))
 
-    messages = _build_messages(texto, historico)
+    system_prompt = _build_system_prompt(
+        texto,
+        BASE_PROMPT,
+        EMOTIONAL_CONTEXT,
+        SYSTEM_INSTRUCTIONS,
+        AGENT_ALGORITHM,
+    )
+    messages = _build_messages(texto, historico, system_prompt)
     acoes_executadas = []
 
     MAX_TOOL_ITERATIONS = 5  # Limite de segurança contra loops infinitos
@@ -419,14 +348,22 @@ async def pensar(texto: str) -> dict:
             log.error(
                 f"HTTP do Grok: {e.response.status_code} - {e.response.text[:200]}"
             )
+            # Tenta Ollama como fallback
+            ollama_result = await _tentar_ollama_fallback(texto, historico)
+            if ollama_result:
+                return ollama_result
             return {
                 "resposta": "Meu cérebro deu tela azul, velho. Tenta de novo.",
                 "acao_executada": None,
             }
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             log.error(f"Conexao com Grok: {e}")
+            # Tenta Ollama como fallback
+            ollama_result = await _tentar_ollama_fallback(texto, historico)
+            if ollama_result:
+                return ollama_result
             return {
-                "resposta": "Sem internet, velho. Tô operando no modo offline.",
+                "resposta": "Sem internet e sem Ollama local, velho. Tô no escuro total.",
                 "acao_executada": None,
             }
         except Exception as e:
@@ -452,3 +389,250 @@ async def pensar(texto: str) -> dict:
 
     acao_final = "; ".join(acoes_executadas) if acoes_executadas else None
     return {"resposta": resposta, "acao_executada": acao_final, "emocao": emocao}
+
+
+# ===== Ollama Fallback =====
+
+
+async def verificar_ollama() -> bool:
+    """Verifica se o Ollama está rodando localmente. Cacheia resultado por 60s."""
+    global _ollama_available, _ollama_last_check
+
+    if not OLLAMA_ENABLED:
+        return False
+
+    now = time.monotonic()
+    if _ollama_available is not None and (now - _ollama_last_check) < _OLLAMA_CHECK_INTERVAL:
+        return _ollama_available
+
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"{OLLAMA_URL}/api/tags")
+            _ollama_available = resp.status_code == 200
+            if _ollama_available:
+                models = [m["name"] for m in resp.json().get("models", [])]
+                log.info(f"Ollama online! Modelos disponíveis: {models}")
+    except Exception:
+        _ollama_available = False
+
+    _ollama_last_check = now
+    return _ollama_available
+
+
+async def _tentar_ollama_fallback(texto: str, historico: list) -> dict | None:
+    """Tenta responder usando Ollama local como fallback."""
+    if not await verificar_ollama():
+        log.warning("Ollama não disponível para fallback.")
+        return None
+
+    log.info(f"Ativando fallback Ollama ({OLLAMA_MODEL})...")
+
+    system_prompt = _build_system_prompt(
+        texto,
+        BASE_PROMPT,
+        EMOTIONAL_CONTEXT,
+        SYSTEM_INSTRUCTIONS,
+        AGENT_ALGORITHM,
+    )
+    messages = _build_messages(texto, historico, system_prompt)
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                OLLAMA_API_URL,
+                json={
+                    "model": OLLAMA_MODEL,
+                    "messages": messages,
+                    "temperature": GROK_TEMPERATURE,
+                    "max_tokens": _calcular_max_tokens(texto),
+                    "stream": False,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            resposta = data["choices"][0]["message"]["content"].strip()
+
+            import re
+            emocao = "neutral"
+            match = re.match(r"^\[(.*?)\]\s*(.*)", resposta, flags=re.DOTALL)
+            if match:
+                emoc_tag = match.group(1).lower().strip()
+                if emoc_tag in ["neutral", "cool", "surprised", "blushing", "angry"]:
+                    emocao = emoc_tag
+                resposta = match.group(2).strip()
+
+            adicionar_interacao(historico, texto, resposta)
+            log.info("Resposta via Ollama concluída com sucesso!")
+            return {"resposta": resposta, "acao_executada": None, "emocao": emocao}
+
+    except Exception as e:
+        log.error(f"Fallback Ollama falhou: {e}")
+        return None
+
+
+# ===== Streaming (TTS imediato) =====
+
+
+async def pensar_stream(texto: str):
+    """
+    Versão streaming do pensar(). Faz yield de sentenças completas conforme
+    os tokens chegam da API, permitindo TTS imediato na primeira frase.
+
+    Yields: dict com {"sentenca": str, "emocao": str, "final": bool}
+
+    NOTA: Não suporta tool calling. Quando detecta necessidade de tools,
+    faz fallback automático para pensar() regular.
+    """
+    historico = carregar_historico()
+
+    # Background tasks (resumo, insights, auto-avaliação)
+    historico_len = len(historico)
+    if historico_len > 0 and historico_len % CONTEXT_WINDOW == 0:
+        asyncio.create_task(_gerar_resumo_background(historico))
+    if historico_len > 0 and historico_len % 25 == 0:
+        asyncio.create_task(_extrair_insights_background(historico))
+    if historico_len > 0 and historico_len % 50 == 0:
+        asyncio.create_task(_auto_avaliar_kuri_background(historico))
+
+    system_prompt = _build_system_prompt(
+        texto,
+        BASE_PROMPT,
+        EMOTIONAL_CONTEXT,
+        SYSTEM_INSTRUCTIONS,
+        AGENT_ALGORITHM,
+    )
+    messages = _build_messages(texto, historico, system_prompt)
+
+    # Decide qual backend usar
+    api_url = GROK_URL
+    headers = {"Authorization": f"Bearer {GROK_API_KEY}"}
+    model = GROK_MODEL
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            async with client.stream(
+                "POST",
+                api_url,
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": GROK_TEMPERATURE,
+                    "max_tokens": _calcular_max_tokens(texto),
+                    "stream": True,
+                },
+            ) as response:
+                response.raise_for_status()
+
+                buffer = ""
+                emocao = "neutral"
+                emocao_extraida = False
+                full_response = ""
+                import re
+
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
+
+                    try:
+                        chunk = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+
+                    # Detecta tool calls — fallback para pensar()
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    if delta.get("tool_calls"):
+                        log.info("Stream detectou tool_calls — fallback para pensar()")
+                        result = await pensar(texto)
+                        yield {
+                            "sentenca": result["resposta"],
+                            "emocao": result.get("emocao", "neutral"),
+                            "final": True,
+                            "acao_executada": result.get("acao_executada"),
+                        }
+                        return
+
+                    content = delta.get("content", "")
+                    if not content:
+                        continue
+
+                    buffer += content
+                    full_response += content
+
+                    # Extrai emoção da primeira tag [emocao]
+                    if not emocao_extraida:
+                        tag_match = re.match(r"^\[(.*?)\]\s*", buffer)
+                        if tag_match:
+                            emoc_tag = tag_match.group(1).lower().strip()
+                            if emoc_tag in ["neutral", "cool", "surprised", "blushing", "angry"]:
+                                emocao = emoc_tag
+                            buffer = buffer[tag_match.end():]
+                            emocao_extraida = True
+                        elif len(buffer) > 15:
+                            emocao_extraida = True
+
+                    # Detecta fim de sentença e faz yield
+                    sentence_end = re.search(r"[.!?]\s", buffer)
+                    if sentence_end:
+                        sentenca = buffer[:sentence_end.end()].strip()
+                        buffer = buffer[sentence_end.end():]
+                        if sentenca:
+                            yield {
+                                "sentenca": sentenca,
+                                "emocao": emocao,
+                                "final": False,
+                            }
+
+                # Flush do buffer restante
+                if buffer.strip():
+                    yield {
+                        "sentenca": buffer.strip(),
+                        "emocao": emocao,
+                        "final": True,
+                    }
+
+                # Limpa tag de emoção do full_response para salvar no histórico
+                clean_response = full_response
+                tag_match = re.match(r"^\[(.*?)\]\s*", clean_response)
+                if tag_match:
+                    clean_response = clean_response[tag_match.end():]
+                adicionar_interacao(historico, texto, clean_response.strip())
+
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        log.error(f"Stream Grok falhou: {e}")
+        # Fallback para Ollama (modo não-stream para simplificar)
+        ollama_result = await _tentar_ollama_fallback(texto, historico)
+        if ollama_result:
+            yield {
+                "sentenca": ollama_result["resposta"],
+                "emocao": ollama_result.get("emocao", "neutral"),
+                "final": True,
+            }
+        else:
+            yield {
+                "sentenca": "Sem internet e sem Ollama, velho. Tô muda.",
+                "emocao": "angry",
+                "final": True,
+            }
+    except Exception as e:
+        log.error(f"Erro no stream: {e}")
+        # Fallback para pensar() regular
+        try:
+            result = await pensar(texto)
+            yield {
+                "sentenca": result["resposta"],
+                "emocao": result.get("emocao", "neutral"),
+                "final": True,
+                "acao_executada": result.get("acao_executada"),
+            }
+        except Exception as e2:
+            log.error(f"Fallback pensar() também falhou: {e2}")
+            yield {
+                "sentenca": "Deu ruim em tudo, velho. Reinicia que resolve.",
+                "emocao": "angry",
+                "final": True,
+            }
+

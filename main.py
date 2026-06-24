@@ -1,5 +1,7 @@
-import asyncio
 import sys
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import asyncio
 from stt import ouvir
 from tts import falar
 from brain import pensar
@@ -58,6 +60,15 @@ async def processar_mensagem(texto: str):
 
 async def loop_hibrido():
     """Modo principal: digite texto ou pressione Enter para usar microfone."""
+    # Health check (Fase 1)
+    try:
+        from health_check import check_environment
+        health = check_environment()
+        if not health.get("ok"):
+            print("[HEALTH] Avisos:", health.get("warnings"))
+    except Exception:
+        pass
+
     print(BANNER)
     print("[OK] Kuri ativa! Pressione Enter para falar ou digite uma mensagem.\n")
 

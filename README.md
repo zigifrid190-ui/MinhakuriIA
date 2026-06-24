@@ -56,7 +56,15 @@ A Kuri evoluiu de um simples chatbot para uma aplicação desktop nativa ultrarr
    ELEVENLABS_VOICE_ID=id_da_voz_escolhida
    USE_PREMIUM_TTS=true
    ```
-5. Inicie a assistente:
+5. **Prepare os assets pesados** (modelos e arquivos de avatar):
+   ```powershell
+   # Execute o script de preparação (recomendado)
+   .\scripts\download_assets.ps1
+   ```
+   > **Importante:** Alguns arquivos (modelo Whisper, Live2D e vídeos do avatar) são muito grandes e **não estão no Git**.
+   > O script irá te guiar sobre o que precisa ser baixado ou restaurado manualmente.
+
+6. Inicie a assistente:
    ```bash
    python kuri_desktop.py
    ```

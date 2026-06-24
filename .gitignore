@@ -1,63 +1,82 @@
+﻿# ============================================
 # Python
+# ============================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 .venv
 venv/
 ENV/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment Variables
+# ============================================
+# Environment
+# ============================================
 .env
+.env.*
+!.env.example
 
-# Kuri Specific (Arquivos de Persistência Local)
+# ============================================
+# Heavy Assets & Models (NÃO versionar - muito grandes)
+# Use scripts/download_assets.ps1 ou baixe manualmente
+# ============================================
+models/
+assets/live2d/
+InterfaceAva/
+
+# ============================================
+# Build, Distribution e Caches
+# ============================================
+build/
+dist/
+*.spec
+*.toc
+*.pyz
+*.pkg
+*.exe
+*.html
+.pytest_cache/
+.ruff_cache/
+out/
+.next/
+.cache/
+*.log
+kuri_*.log
+kuri_resposta.mp3
+
+# ============================================
+# Kuri - Arquivos de Persistência Local
+# ============================================
 kuri_memoria.json
 kuri_perfil.json
-kuri_resposta.mp3
 kuri_log.txt
+kuri_gui_config.json
 *.mp3
 *.wav
 *.db
 
-# IDEs
+# ============================================
+# IDEs e Sistema Operacional
+# ============================================
 .vscode/
 .idea/
-
-# Windows
 Thumbs.db
 desktop.ini
 
-# Agent & Design System Kit
-# (Mantemos as regras, mas evitamos lixo temporário)
+# ============================================
+# Templates / Agent Kit (ruído)
+# ============================================
 .agent/scratch/
 .agent/logs/
 DESIGN-SYSTEMS/
 designer/
 
-# Future-proofing (patterns comuns de builds e configs)
-*.log
-.env.*
-!.env.example
-dist/
-build/
-out/
-.next/
-.cache/
+# ============================================
+# Outros
+# ============================================
 node_modules/
