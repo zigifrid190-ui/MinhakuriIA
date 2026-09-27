@@ -1,25 +1,38 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
+# Coleta recursivamente recursos, binários e hiddenimports de faster_whisper, ctranslate2 e live2d
+datas_fw, binaries_fw, hiddenimports_fw = collect_all('faster_whisper')
+datas_ct, binaries_ct, hiddenimports_ct = collect_all('ctranslate2')
+datas_l2d, binaries_l2d, hiddenimports_l2d = collect_all('live2d')
+
 added_files = [
     ('InterfaceAva', 'InterfaceAva'),
+    ('assets/live2d/kuri_model', 'assets/live2d/kuri_model'),
+    ('models/whisper-base', 'models/whisper-base'),
+    ('models/silero-vad', 'models/silero-vad'),
+    ('kuri_skills', 'kuri_skills'),
     ('prompt_kuri.txt', '.'),
-    ('.env', '.'),
-]
+] + datas_fw + datas_ct + datas_l2d
+
+hiddenimports = [
+    'PyQt6.QtMultimedia',
+    'PyQt6.QtMultimediaWidgets',
+    'PyQt6.QtOpenGLWidgets',
+    'live2d.v3',
+    'OpenGL',
+    'sounddevice',
+    'engineio.async_drivers.threading', # às vezes necessário para async
+] + hiddenimports_fw + hiddenimports_ct + hiddenimports_l2d
 
 a = Analysis(
     ['kuri_desktop.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries_fw + binaries_ct + binaries_l2d,
     datas=added_files,
-    hiddenimports=[
-        'PyQt6.QtMultimedia',
-        'PyQt6.QtMultimediaWidgets',
-        'faster_whisper',
-        'sounddevice',
-        'engineio.async_drivers.threading', # às vezes necessário para async
-    ],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -41,7 +54,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False, # Define como False para não abrir o terminal
+    console=True, # Mantemos temporariamente True para depuração de erros
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -102,8 +102,9 @@ class TestSocialMonitorSkills(unittest.TestCase):
         
         result = sm.checar_redes_sociais(plataforma="todas")
         self.assertIn("Reddit AI & Python Trends", result)
-        self.assertIn("YouTube Dev & AI Updates", result)
-        self.assertIn("Tech & Discord Feeds", result)
+        self.assertIn("=== YouTube ===", result)
+        self.assertIn("Não vou inventar vídeo", result)
+        self.assertIn("Twitter/X: sem API", result)
 
 if __name__ == "__main__":
     unittest.main()

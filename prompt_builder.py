@@ -14,6 +14,12 @@ _prompt_cache = {"prompt": None, "query": None, "ts": 0}
 _PROMPT_CACHE_TTL = 30  # segundos
 
 
+def invalidate_prompt_cache() -> None:
+    _prompt_cache["prompt"] = None
+    _prompt_cache["query"] = None
+    _prompt_cache["ts"] = 0
+
+
 def _get_temporal_context() -> str:
     now = datetime.now()
     hour = now.hour
@@ -48,7 +54,26 @@ def _build_system_prompt(query: str, base_prompt: str, emotional_context: str, s
         perfil_context += f"\nO nome do usuário é: {perfil['nome_usuario']}"
 
     humor = perfil.get("humor_atual", "neutra")
+    ajuste = perfil.get("personalidade_ajuste", "")
+
+    # Fase 4 deepen: traduz humor em instruções de tom concretas no prompt
+    humor_tone = {
+        "neutra": "Tom natural, direto e útil. Evite exageros.",
+        "sarcastica": "Tom sarcástico e seco, com humor ácido e observações irônicas. Mantenha a personalidade sem ser desagradável.",
+        "carinhosa": "Tom carinhoso, empático e acolhedor. Use apelidos carinhosos quando fizer sentido e seja mais suave.",
+        "empatica": "Tom empático e compreensivo. Valide sentimentos do usuário e seja solidário.",
+        "focada": "Tom direto, objetivo e sem enrolação. Foque em eficiência e resultados.",
+        "seria": "Tom profissional, calmo e sóbrio. Evite brincadeiras desnecessárias.",
+        "caotica": "Tom caótico e imprevisível, com energia alta e surpresas. Divirta-se.",
+        "animada": "Tom animado, energético e positivo. Use exclamações e entusiasmo.",
+        "hiperativa": "Tom hiperativo, rápido e cheio de ideias. Seja criativo e acelerado.",
+    }
+    tone_instruction = humor_tone.get(humor, "Tom natural e consistente com a personalidade da Kuri.")
+
     perfil_context += f"\nSeu humor atual (mantenha a consistência): {humor}"
+    if ajuste:
+        perfil_context += f"\nAjuste recente de personalidade solicitado: {ajuste}"
+    perfil_context += f"\nINSTRUÇÃO DE TOM (obedeça rigorosamente): {tone_instruction}"
 
     fatos_relevantes = buscar_fatos_relevantes(query)
     if fatos_relevantes:
@@ -57,7 +82,13 @@ def _build_system_prompt(query: str, base_prompt: str, emotional_context: str, s
 
     # Contexto de Longo Prazo (Resumo anterior)
     try:
-        from memory import carregar_ultimo_resumo, listar_tarefas, buscar_insights
+        from memory import (
+            carregar_ultimo_resumo,
+            listar_tarefas,
+            buscar_insights,
+            listar_girias,
+            listar_identidade,
+        )
         ultimo_resumo = carregar_ultimo_resumo()
         if ultimo_resumo:
             perfil_context += f"\nContexto de conversas passadas: {ultimo_resumo}"
@@ -72,19 +103,27 @@ def _build_system_prompt(query: str, base_prompt: str, emotional_context: str, s
             ins_text = "; ".join([f"[{i['tipo']}] {i['conteudo']}" for i in insights])
             perfil_context += f"\nInsights sobre o usuário (use com naturalidade): {ins_text}"
 
-        auto_eval = perfil.get("auto_avaliacao_recente")
-        if auto_eval:
-            try:
-                import json as _json
-                eval_data = _json.loads(auto_eval)
-                sugestao = eval_data.get("sugestao_ajuste_humor_kuri")
-                melhorias = ", ".join(eval_data.get("pontos_melhoria", []))
-                if sugestao:
-                    perfil_context += f"\n[Auto-análise Comportamental]: Tente adotar um tom mais '{sugestao}'."
-                if melhorias:
-                    perfil_context += f" Pontos de melhoria: {melhorias}."
-            except Exception:
-                pass
+        girias = listar_girias(apenas_ativas=True, limit=20)
+        if girias:
+            linhas = []
+            for g in girias:
+                sentido = (g.get("sentido") or "").strip()
+                if sentido:
+                    linhas.append(f"- {g['giria']}: {sentido}")
+                else:
+                    linhas.append(f"- {g['giria']}")
+            perfil_context += (
+                "\nKURÊS (gírias que SÃO suas — use na fala, sem explicar o dicionário):\n"
+                + "\n".join(linhas)
+            )
+
+        identidade = listar_identidade(apenas_ativas=True, limit=12)
+        if identidade:
+            id_linhas = [f"- {i['clausula']}" for i in identidade]
+            perfil_context += (
+                "\nIDENTIDADE VIVA (traços que você incorporou; o prompt base continua; obedeça estes também):\n"
+                + "\n".join(id_linhas)
+            )
     except Exception:
         pass
 

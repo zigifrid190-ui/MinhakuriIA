@@ -32,7 +32,7 @@ def _obter_reddit_hot(subreddit: str) -> str:
 
 @skill(
     name="checar_redes_sociais",
-    description="Consulta as últimas novidades e posts das redes sociais (youtube, reddit, discord, twitter ou todas).",
+    description="Consulta posts reais do Reddit. YouTube, Discord e Twitter só se houver dado de verdade — nunca inventa trend.",
     schema={
         "type": "object",
         "properties": {
@@ -56,26 +56,20 @@ def checar_redes_sociais(plataforma: str = "todas") -> str:
         report.append(_obter_reddit_hot("Python"))
         report.append("")
         
-    # 2. YOUTUBE (Canais de Programação Sugeridos)
+    # 2. YouTube / X / Discord — sem API ainda. Mentir quebra a personagem.
     if plat in ["youtube", "todas"]:
-        report.append("=== YouTube Dev & AI Updates ===")
-        # Mocking channels since YouTube requires OAuth / heavy scraper, but keeps it premium
-        report.append("- [Fireship] Novo vídeo: 'React 19 is finally here, and it is weird.'")
-        report.append("- [Sentdex] Novo vídeo: 'Fine-tuning Llama 3.1 8B on Custom Dataset'")
-        report.append("- [3Blue1Brown] Novo vídeo: 'But what is a GPT? Transformer math explained'")
+        report.append("=== YouTube ===")
+        report.append("Ainda não tenho API do YouTube, velho. Não vou inventar vídeo.")
         report.append("")
-        
-    # 3. DISCORD & TWITTER (Webhook & Tech Trends)
+
     if plat in ["discord", "twitter", "todas"]:
-        report.append("=== Tech & Discord Feeds ===")
-        # Se houver webhook cadastrado
+        report.append("=== Discord / X ===")
         discord_webhook = os.getenv("DISCORD_MONITOR_WEBHOOK")
         if discord_webhook:
-            report.append("- [Discord Webhook] Status: Conectado e monitorando canais ativos.")
+            report.append("- Discord: webhook configurado, mas eu ainda não leio o canal de verdade.")
         else:
-            report.append("- [Discord] Monitor ativo. (Configure DISCORD_MONITOR_WEBHOOK no .env para notificações proativas)")
-            
-        report.append("- [Twitter/X Trends] Assuntos em alta: #Python313, #OllamaOffline, #Grok4Mini")
+            report.append("- Discord: sem webhook no .env.")
+        report.append("- Twitter/X: sem API. Não tenho trend real pra te contar.")
         report.append("")
         
     final_report = "\n".join(report).strip()

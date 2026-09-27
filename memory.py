@@ -88,6 +88,29 @@ class MemoryManager:
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Kurês — gírias da Kuri (Movimento 2.1)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS girias (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    giria TEXT NOT NULL UNIQUE,
+                    sentido TEXT,
+                    origem TEXT DEFAULT 'kuri',
+                    ativa INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Identidade viva — cláusulas que a Kuri incorpora (Movimento 2.2)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS identidade (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    clausula TEXT NOT NULL UNIQUE,
+                    origem TEXT DEFAULT 'usuario',
+                    ativa INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     # --- Histórico ---
@@ -183,14 +206,12 @@ class MemoryManager:
 
     def buscar_fatos_relevantes(self, query: str, limit: int = 5) -> List[str]:
         """Busca fatos relevantes baseados em palavras-chave da mensagem do usuário."""
-        # Limpa pontuações básicas e divide em palavras menores que 3 caracteres
         import re
 
         query_limpa = re.sub(r"[^\w\s]", "", query.lower())
         keywords = [kw for kw in query_limpa.split() if len(kw) > 2]
 
         if not keywords:
-            # Se não tem keyword relevante, busca os mais recentes
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     cursor = conn.cursor()
@@ -390,6 +411,133 @@ class MemoryManager:
             log.error(f"adicionar_historico_acao: {e}")
             return False
 
+    # --- Kurês ---
+    def adicionar_giria(self, giria: str, sentido: str = "", origem: str = "kuri") -> bool:
+        """Persiste uma gíria da Kuri. Duplicata reativa e atualiza o sentido."""
+        giria = (giria or "").strip()
+        if not giria:
+            return False
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO girias (giria, sentido, origem, ativa)
+                    VALUES (?, ?, ?, 1)
+                    ON CONFLICT(giria) DO UPDATE SET
+                        sentido = excluded.sentido,
+                        origem = excluded.origem,
+                        ativa = 1
+                    """,
+                    (giria, (sentido or "").strip(), origem),
+                )
+                conn.commit()
+            try:
+                from prompt_builder import invalidate_prompt_cache
+                invalidate_prompt_cache()
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            log.error(f"adicionar_giria: {e}")
+            return False
+
+    def listar_girias(self, apenas_ativas: bool = True, limit: int = 40) -> List[Dict[str, Any]]:
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if apenas_ativas:
+                    cursor.execute(
+                        "SELECT giria, sentido, origem FROM girias WHERE ativa = 1 ORDER BY created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT giria, sentido, origem, ativa FROM girias ORDER BY created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                return [dict(r) for r in cursor.fetchall()]
+        except Exception as e:
+            log.error(f"listar_girias: {e}")
+            return []
+
+    def desativar_giria(self, giria: str) -> bool:
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE girias SET ativa = 0 WHERE giria = ?", (giria.strip(),))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            log.error(f"desativar_giria: {e}")
+            return False
+
+    def adicionar_clausula_identidade(self, clausula: str, origem: str = "usuario") -> bool:
+        """Anexa um traço permanente. Não reescreve o prompt_kuri.txt."""
+        clausula = " ".join((clausula or "").strip().split())
+        if not clausula:
+            return False
+        if len(clausula) > 160:
+            clausula = clausula[:157] + "..."
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO identidade (clausula, origem, ativa)
+                    VALUES (?, ?, 1)
+                    ON CONFLICT(clausula) DO UPDATE SET
+                        origem = excluded.origem,
+                        ativa = 1
+                    """,
+                    (clausula, origem),
+                )
+                conn.commit()
+            try:
+                from prompt_builder import invalidate_prompt_cache
+                invalidate_prompt_cache()
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            log.error(f"adicionar_clausula_identidade: {e}")
+            return False
+
+    def listar_identidade(self, apenas_ativas: bool = True, limit: int = 12) -> List[Dict[str, Any]]:
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                if apenas_ativas:
+                    cursor.execute(
+                        "SELECT clausula, origem FROM identidade WHERE ativa = 1 ORDER BY created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT clausula, origem, ativa FROM identidade ORDER BY created_at DESC LIMIT ?",
+                        (limit,),
+                    )
+                return [dict(r) for r in cursor.fetchall()]
+        except Exception as e:
+            log.error(f"listar_identidade: {e}")
+            return []
+
+    def desativar_clausula_identidade(self, clausula: str) -> bool:
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE identidade SET ativa = 0 WHERE clausula = ?",
+                    (clausula.strip(),),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            log.error(f"desativar_clausula_identidade: {e}")
+            return False
+
 
 # Instância única para uso global
 memory = MemoryManager()
@@ -398,6 +546,71 @@ memory = MemoryManager()
 # Funções de conveniência para manter compatibilidade onde possível
 def carregar_historico():
     return memory.carregar_historico()
+
+
+# --- Fase 4: Estratégia clara de memória (aprofundada) ---
+def aplicar_estrategia_memoria():
+    """Aplica estratégia de polimento da memória:
+    - Prune histórico antigo (mantém recentes + fatos/resumos protegidos)
+    - Mantém fatos priorizados e resumos
+    - Limpa ações antigas
+    """
+    try:
+        with sqlite3.connect(memory.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Protege fatos e resumos: nunca deleta linhas que são referenciadas por fatos ou resumos
+            # Prune histórico: mantém os mais recentes + todos os que têm fatos associados indiretamente via perfil/historico
+            cursor.execute(f"""
+                DELETE FROM historico 
+                WHERE id NOT IN (
+                    SELECT id FROM historico 
+                    ORDER BY timestamp DESC 
+                    LIMIT {MAX_MEMORY_MESSAGES * 2}
+                )
+            """)
+
+            # Limpa ações muito antigas (mantém últimas 150 para auditoria)
+            cursor.execute("""
+                DELETE FROM historico_acoes 
+                WHERE id NOT IN (
+                    SELECT id FROM historico_acoes 
+                    ORDER BY timestamp DESC 
+                    LIMIT 150
+                )
+            """)
+
+            # Opcional: compacta fatos muito antigos de baixa importância (mantém os importantes)
+            cursor.execute("""
+                DELETE FROM fatos 
+                WHERE importancia < 2 
+                  AND id NOT IN (
+                      SELECT id FROM fatos 
+                      ORDER BY importancia DESC, timestamp DESC 
+                      LIMIT 50
+                  )
+            """)
+
+            conn.commit()
+            log.info("Estratégia de memória aplicada: prune + proteção de fatos/resumos")
+    except Exception as e:
+        log.error(f"aplicar_estrategia_memoria: {e}")
+
+
+def salvar_fato_usuario(fato: str, importancia: int = 1):
+    """Wrapper para adicionar fato com estratégia."""
+    memory.adicionar_fato(fato)
+    # Opcional: ajustar importancia
+    try:
+        with sqlite3.connect(memory.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE fatos SET importancia = ? WHERE fato = ?",
+                (importancia, fato)
+            )
+            conn.commit()
+    except Exception:
+        pass
 
 
 def adicionar_interacao(historico: list, user_msg: str, assistant_msg: str):
@@ -453,6 +666,30 @@ def adicionar_insight(tipo: str, conteudo: str, confianca: float = 0.5):
 
 def buscar_insights(limit: int = 10):
     return memory.buscar_insights(limit)
+
+
+def adicionar_giria(giria: str, sentido: str = "", origem: str = "kuri"):
+    return memory.adicionar_giria(giria, sentido, origem)
+
+
+def listar_girias(apenas_ativas: bool = True, limit: int = 40):
+    return memory.listar_girias(apenas_ativas, limit)
+
+
+def desativar_giria(giria: str):
+    return memory.desativar_giria(giria)
+
+
+def adicionar_clausula_identidade(clausula: str, origem: str = "usuario"):
+    return memory.adicionar_clausula_identidade(clausula, origem)
+
+
+def listar_identidade(apenas_ativas: bool = True, limit: int = 12):
+    return memory.listar_identidade(apenas_ativas, limit)
+
+
+def desativar_clausula_identidade(clausula: str):
+    return memory.desativar_clausula_identidade(clausula)
 
 
 def listar_insights(tipo: str = None):

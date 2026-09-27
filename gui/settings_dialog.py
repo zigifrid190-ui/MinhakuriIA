@@ -25,8 +25,16 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from config import USE_PREMIUM_TTS
+from gui.live2d_avatar import can_use_live2d_avatar
 
-GUI_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "kuri_gui_config.json")
+import sys
+
+if getattr(sys, "frozen", False):
+    # Salva as configurações na mesma pasta do executável KuriIA.exe
+    GUI_CONFIG_FILE = os.path.join(os.path.dirname(sys.executable), "kuri_gui_config.json")
+else:
+    # Em desenvolvimento, salva na raiz do projeto
+    GUI_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "kuri_gui_config.json")
 
 
 def load_gui_config() -> dict:
@@ -36,7 +44,12 @@ def load_gui_config() -> dict:
         "output_device": None,
         "volume": 80,
         "use_premium_tts": USE_PREMIUM_TTS,
+        "use_live2d_avatar": True,
+        "ollama_enabled": True,
+        "use_typewriter": True,
+        "use_mouse_tracking": True,
         "widget_pos": None,
+        "widget_size": [380, 380],
     }
     try:
         with open(GUI_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -198,7 +211,7 @@ class SettingsDialog(QDialog):
 
     def _setup_ui(self):
         self.setWindowTitle("KURI — Configurações")
-        self.setFixedSize(420, 360)
+        self.setFixedSize(420, 540)
         self.setStyleSheet(STYLE)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
@@ -264,6 +277,42 @@ class SettingsDialog(QDialog):
         self.premium_check.setChecked(self.config.get("use_premium_tts", False))
         layout.addWidget(self.premium_check)
 
+        self.live2d_check = QCheckBox("Usar avatar Live2D (reinicia ao salvar)")
+        self.live2d_check.setChecked(self.config.get("use_live2d_avatar", True))
+        self.live2d_check.setEnabled(can_use_live2d_avatar())
+        if not can_use_live2d_avatar():
+            self.live2d_check.setToolTip(
+                "Instale live2d-py e execute scripts/prepare_live2d_model.py"
+            )
+        layout.addWidget(self.live2d_check)
+
+        self.typewriter_check = QCheckBox("Texto gradual na bolha (Typewriter)")
+        self.typewriter_check.setChecked(self.config.get("use_typewriter", True))
+        layout.addWidget(self.typewriter_check)
+
+        self.mouse_check = QCheckBox("Olhar do avatar segue o cursor do mouse")
+        self.mouse_check.setChecked(self.config.get("use_mouse_tracking", True))
+        layout.addWidget(self.mouse_check)
+
+        sep4 = QFrame()
+        sep4.setObjectName("separator")
+        layout.addWidget(sep4)
+
+        # ── Ollama Fallback ────────────────────────────────────────────────
+        ollama_row = QHBoxLayout()
+        self.ollama_check = QCheckBox("Fallback Ollama (LLM local)")
+        self.ollama_check.setChecked(self.config.get("ollama_enabled", True))
+
+        self.ollama_status = QLabel("● VERIFICANDO")
+        self.ollama_status.setStyleSheet("color: #606060; font-size: 10px;")
+        ollama_row.addWidget(self.ollama_check)
+        ollama_row.addStretch()
+        ollama_row.addWidget(self.ollama_status)
+        layout.addLayout(ollama_row)
+
+        # Verifica status do Ollama em background
+        self._check_ollama_status()
+
         layout.addStretch()
 
         # ── Botões ────────────────────────────────────────────────────────
@@ -299,7 +348,7 @@ class SettingsDialog(QDialog):
             self.output_combo.addItem(f"[{idx}] {name}", idx)
 
     def _restore_selections(self):
-        """Restaura seleção salva nos combos."""
+        """Restaura seleção salva nos combos e checkboxes."""
         saved_in = self.config.get("input_device")
         saved_out = self.config.get("output_device")
 
@@ -313,13 +362,38 @@ class SettingsDialog(QDialog):
                 self.output_combo.setCurrentIndex(i)
                 break
 
+        self.typewriter_check.setChecked(self.config.get("use_typewriter", True))
+        self.mouse_check.setChecked(self.config.get("use_mouse_tracking", True))
+
     def _save_and_close(self):
         self.config["input_device"] = self.input_combo.currentData()
         self.config["output_device"] = self.output_combo.currentData()
         self.config["volume"] = self.volume_slider.value()
         self.config["use_premium_tts"] = self.premium_check.isChecked()
+        self.config["use_live2d_avatar"] = self.live2d_check.isChecked()
+        self.config["ollama_enabled"] = self.ollama_check.isChecked()
+        self.config["use_typewriter"] = self.typewriter_check.isChecked()
+        self.config["use_mouse_tracking"] = self.mouse_check.isChecked()
         save_gui_config(self.config)
         self.accept()
+
+    def _check_ollama_status(self):
+        """Verifica se o Ollama está rodando em background."""
+        import threading
+        def _check():
+            try:
+                import urllib.request
+                req = urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3)
+                if req.status == 200:
+                    self.ollama_status.setText("● ONLINE")
+                    self.ollama_status.setStyleSheet("color: #00FF88; font-size: 10px; font-weight: bold;")
+                else:
+                    self.ollama_status.setText("● OFFLINE")
+                    self.ollama_status.setStyleSheet("color: #FF4444; font-size: 10px;")
+            except Exception:
+                self.ollama_status.setText("● OFFLINE")
+                self.ollama_status.setStyleSheet("color: #606060; font-size: 10px;")
+        threading.Thread(target=_check, daemon=True).start()
 
     # Suporte a arrastar o dialog (sem borda)
     def mousePressEvent(self, event):

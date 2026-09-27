@@ -61,6 +61,7 @@ def abrir_pasta(caminho: str) -> str:
 @skill(
     name="gerenciar_tarefa",
     description="Gerencia a lista de tarefas (To-Do) do usuário. Use para criar, concluir ou remover itens.",
+    # dependencies=["outra_skill"],  # Exemplo Fase 3
     schema={
         "type": "object",
         "properties": {

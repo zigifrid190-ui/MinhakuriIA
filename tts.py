@@ -6,6 +6,7 @@ import httpx
 import pygame
 import hashlib
 import re
+import numpy as np
 from config import (
     EDGE_TTS_VOICE,
     USE_PREMIUM_TTS,
@@ -16,8 +17,13 @@ from logger import get_logger
 
 log = get_logger("tts")
 
-# Inicializa pygame mixer uma vez
-pygame.mixer.init()
+# Inicializa pygame mixer com tratamento de erros caso não haja saída de áudio
+try:
+    pygame.mixer.init()
+    _mixer_initialized = True
+except Exception as e:
+    log.error(f"Não foi possível inicializar o mixer de áudio (saída): {e}")
+    _mixer_initialized = False
 
 # Configurações de Cache
 CACHE_DIR = "tts_cache"
@@ -124,27 +130,136 @@ async def _falar_elevenlabs(texto: str, emocao: str):
         await _falar_edge_tts(texto, emocao)
 
 
+def _envelope_from_sound_bytes(raw: bytes, frame_s: float = 0.05) -> list[float] | None:
+    """RMS por fatia ~50ms para lip sync. None se o pygame não decodificar."""
+    if not _mixer_initialized or not raw:
+        return None
+    try:
+        sound = pygame.mixer.Sound(io.BytesIO(raw))
+        arr = np.asarray(pygame.sndarray.array(sound), dtype=np.float32)
+        if arr.ndim > 1:
+            arr = arr.mean(axis=1)
+        peak = float(np.max(np.abs(arr))) or 1.0
+        arr = arr / peak
+        init = pygame.mixer.get_init()
+        sr = int(init[0]) if init else 22050
+        win = max(1, int(sr * frame_s))
+        frames = []
+        for i in range(0, max(1, len(arr) - win + 1), win):
+            chunk = arr[i : i + win]
+            rms = float(np.sqrt(np.mean(chunk * chunk)))
+            frames.append(min(1.0, rms * 2.8))
+        return frames or None
+    except Exception as e:
+        log.debug(f"envelope de áudio indisponível: {e}")
+        return None
+
+
+def _drive_mouth(envelope: list[float] | None, elapsed_s: float, frame_s: float = 0.05) -> None:
+    try:
+        from gui.kuri_bridge import bridge
+    except Exception:
+        return
+    if envelope:
+        idx = min(len(envelope) - 1, max(0, int(elapsed_s / frame_s)))
+        bridge.set_mouth(envelope[idx])
+    else:
+        # Fallback: pulso no tempo de playback, não no tick do Live2D
+        import math
+        bridge.set_mouth(0.22 + 0.28 * (0.5 + 0.5 * math.sin(elapsed_s * 14.0)))
+
+
+def _reproduzir_pcm_like(load_fn, envelope: list[float] | None):
+    """Toca e empurra a boca no ritmo do áudio. load_fn carrega no mixer.music."""
+    from kuri_runtime import set_speaking
+
+    if not _mixer_initialized:
+        log.warning("Mixer de áudio não inicializado. Pulando reprodução.")
+        import time
+        time.sleep(1.0)
+        return
+    try:
+        try:
+            from gui.kuri_bridge import KuriState, bridge
+            bridge.set_state(KuriState.SPEAKING)
+        except Exception:
+            pass
+        set_speaking(True)
+        load_fn()
+        pygame.mixer.music.play()
+        t0 = pygame.time.get_ticks()
+        while pygame.mixer.music.get_busy():
+            elapsed = (pygame.time.get_ticks() - t0) / 1000.0
+            _drive_mouth(envelope, elapsed)
+            pygame.time.wait(30)
+    except Exception as e:
+        log.error(f"Reprodução: {e}")
+    finally:
+        set_speaking(False)
+        try:
+            from gui.kuri_bridge import KuriState, bridge
+            bridge.set_mouth(0.0)
+            bridge.set_state(KuriState.THINKING)
+        except Exception:
+            pass
+        try:
+            pygame.mixer.music.unload()
+        except Exception:
+            pass
+
+
 def _reproduzir_buffer(buffer: io.BytesIO):
     """Toca áudio direto do buffer de memória."""
-    try:
-        pygame.mixer.music.load(buffer)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.wait(50)
-    except Exception as e:
-        log.error(f"Reprodução buffer: {e}")
-    finally:
-        pygame.mixer.music.unload()
+    raw = buffer.getvalue()
+    envelope = _envelope_from_sound_bytes(raw)
+    replay = io.BytesIO(raw)
+    _reproduzir_pcm_like(lambda: pygame.mixer.music.load(replay), envelope)
 
 
 def _reproduzir_audio_file(path: str):
     """Toca arquivo de áudio local."""
+    raw = b""
     try:
-        pygame.mixer.music.load(path)
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            pygame.time.wait(50)
-    except Exception as e:
-        log.error(f"Reprodução arquivo: {e}")
-    finally:
-        pygame.mixer.music.unload()
+        with open(path, "rb") as f:
+            raw = f.read()
+    except Exception:
+        pass
+    envelope = _envelope_from_sound_bytes(raw) if raw else None
+    _reproduzir_pcm_like(lambda: pygame.mixer.music.load(path), envelope)
+
+
+async def falar_stream(sentenca_generator, premium: bool | None = None):
+    """
+    Consome um async generator de sentenças (do pensar_stream) e fala cada
+    uma imediatamente. O usuário ouve a primeira frase enquanto o LLM
+    ainda gera o restante.
+
+    Args:
+        sentenca_generator: async generator que yield dicts com
+            {"sentenca": str, "emocao": str, "final": bool}
+        premium: forçar ElevenLabs ou não (None = usar config global)
+
+    Returns:
+        dict com {"resposta_completa": str, "emocao": str, "acao_executada": str | None}
+    """
+    usar_premium = premium if premium is not None else USE_PREMIUM_TTS
+    resposta_completa = []
+    emocao_final = "neutral"
+    acao_executada = None
+
+    async for chunk in sentenca_generator:
+        sentenca = chunk.get("sentenca", "")
+        emocao = chunk.get("emocao", "neutral")
+        emocao_final = emocao
+        acao_executada = chunk.get("acao_executada", acao_executada)
+
+        if sentenca:
+            resposta_completa.append(sentenca)
+            await _processar_fala(sentenca, usar_premium, emocao)
+
+    return {
+        "resposta_completa": " ".join(resposta_completa),
+        "emocao": emocao_final,
+        "acao_executada": acao_executada,
+    }
+

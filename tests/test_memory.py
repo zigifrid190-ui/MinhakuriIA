@@ -142,6 +142,45 @@ class TestMemoryManager(unittest.TestCase):
         self.assertEqual(len(insights), 1)
         self.assertAlmostEqual(insights[0]["confianca"], 0.9)
 
+    def test_adicionar_e_listar_giria(self):
+        self.assertTrue(self.mm.adicionar_giria("café na veia nuclear", "hiperativa de espresso"))
+        girias = self.mm.listar_girias()
+        self.assertEqual(len(girias), 1)
+        self.assertEqual(girias[0]["giria"], "café na veia nuclear")
+        self.assertIn("espresso", girias[0]["sentido"])
+
+    def test_giria_duplicada_reativa(self):
+        self.mm.adicionar_giria("tilt cósmico", "perdeu a ranked")
+        self.mm.adicionar_giria("tilt cósmico", "perdeu FEIO a ranked")
+        girias = self.mm.listar_girias()
+        self.assertEqual(len(girias), 1)
+        self.assertIn("FEIO", girias[0]["sentido"])
+
+    def test_desativar_giria(self):
+        self.mm.adicionar_giria("bora explode", "")
+        self.assertTrue(self.mm.desativar_giria("bora explode"))
+        self.assertEqual(self.mm.listar_girias(apenas_ativas=True), [])
+
+    def test_identidade_viva(self):
+        self.assertTrue(
+            self.mm.adicionar_clausula_identidade(
+                "zoar mais quando ele tiltar no LoL", origem="usuario"
+            )
+        )
+        itens = self.mm.listar_identidade()
+        self.assertEqual(len(itens), 1)
+        self.assertIn("LoL", itens[0]["clausula"])
+
+    def test_identidade_duplicada(self):
+        self.mm.adicionar_clausula_identidade("ser mais direta", origem="usuario")
+        self.mm.adicionar_clausula_identidade("ser mais direta", origem="auto")
+        self.assertEqual(len(self.mm.listar_identidade()), 1)
+
+    def test_desativar_identidade(self):
+        self.mm.adicionar_clausula_identidade("menos café na fala", origem="kuri")
+        self.assertTrue(self.mm.desativar_clausula_identidade("menos café na fala"))
+        self.assertEqual(self.mm.listar_identidade(), [])
+
     def test_listar_insights_por_tipo(self):
         self.mm.adicionar_insight("preferencia", "Café amargo", 0.8)
         self.mm.adicionar_insight("habito", "Dorme tarde", 0.6)

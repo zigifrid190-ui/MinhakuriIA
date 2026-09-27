@@ -12,12 +12,16 @@ import re as _re
 
 import httpx
 
-from config import GROK_API_KEY, GROK_MODEL, GROK_URL, CONTEXT_WINDOW
+from config import (
+    GROK_API_KEY, GROK_MODEL, GROK_URL, CONTEXT_WINDOW,
+    RESUMO_INTERVALO, INSIGHTS_INTERVALO, AUTO_AVALIACAO_INTERVALO
+)
 from logger import get_logger
 from memory import (
     salvar_resumo,
     adicionar_insight,
     atualizar_perfil,
+    adicionar_clausula_identidade,
 )
 
 log = get_logger("memory_background")
@@ -114,10 +118,12 @@ async def _auto_avaliar_kuri_background(historico: list):
         )
 
         prompt_avaliacao = (
-            "Analise as últimas 50 interações da Kuri (IA) com o Usuário para auto-avaliação.\n"
-            "Avalie o nível de satisfação do usuário, a eficácia do tom adotado pela Kuri, "
-            "e identifique áreas de melhoria.\n"
-            "Gere JSON com: satisfacao_usuario, sugestao_ajuste_humor_kuri, pontos_melhoria.\n\n"
+            "Analise as últimas 50 interações da Kuri (IA) com o Usuário.\n"
+            "Gere JSON com:\n"
+            '- "satisfacao_usuario": número 0 a 1\n'
+            '- "clausulas_identidade": até 2 frases CURTAS no infinitivo que a Kuri deve incorporar '
+            '(ex: "zoar mais quando ele tiltar no LoL"). Só traços estáveis, não humor de um turno.\n'
+            "Retorne APENAS o JSON.\n\n"
             f"Histórico:\n{mensagens_texto}"
         )
 
@@ -141,6 +147,13 @@ async def _auto_avaliar_kuri_background(historico: list):
             if match:
                 avaliacao_json = match.group()
                 atualizar_perfil("auto_avaliacao_recente", avaliacao_json)
-                log.info("Auto-avaliação salva com sucesso.")
+                try:
+                    data = json.loads(avaliacao_json)
+                    for clausula in (data.get("clausulas_identidade") or [])[:2]:
+                        if isinstance(clausula, str) and clausula.strip():
+                            adicionar_clausula_identidade(clausula.strip(), origem="auto")
+                except Exception as parse_err:
+                    log.warning(f"Auto-avaliação JSON ok, cláusulas não aplicadas: {parse_err}")
+                log.info("Auto-avaliação salva na identidade viva.")
     except Exception as e:
         log.error(f"Falha na auto-avaliação: {e}")

@@ -25,6 +25,7 @@ class DesignTokens:
     COLOR_LISTENING = "#00FF88"
     COLOR_THINKING = "#6366F1"  # Indigo para pensar
     COLOR_SPEAKING = "#00D1FF"  # Azul claro para falar
+    COLOR_SLEEPING = "#4A4A6A"  # Roxo/azul escuro suave para sono
     COLOR_ERROR = "#FF3333"
 
     # ── Estilos CSS Reutilizáveis ─────────────────────────────────────────────
@@ -84,5 +85,11 @@ class DesignTokens:
             background-color: rgba(0, 255, 136, 0.1);
             color: {cls.ACCENT_NEON};
             border: 1px solid {cls.ACCENT_NEON};
+        }}
+        
+        QLabel#status_dot {{
+            background-color: {cls.COLOR_IDLE};
+            border: 1.5px solid {cls.BG_ROOT};
+            border-radius: 6px;
         }}
         """

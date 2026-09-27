@@ -35,7 +35,7 @@ class SkillRegistry:
         self.registry: Dict[str, Callable] = {}
         self.schemas: List[Dict[str, Any]] = []
 
-    def register(self, name: str, description: str, schema: Dict[str, Any] = None):
+    def register(self, name: str, description: str, schema: Dict[str, Any] = None, dependencies: List[str] = None):
         def decorator(func: Callable):
             actual_schema = {
                 "type": "function",
@@ -45,6 +45,9 @@ class SkillRegistry:
                     "parameters": schema or {"type": "object", "properties": {}}
                 }
             }
+            
+            # Armazena metadados de dependências para evolução da arquitetura (Fase 3)
+            func._skill_dependencies = dependencies or []
             
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
@@ -69,6 +72,25 @@ class SkillRegistry:
         """Limpa o registro de skills para recarregamento dinâmico sem duplicatas."""
         self.registry.clear()
         self.schemas.clear()
+
+    def get_dependencies(self, name: str) -> List[str]:
+        """Retorna dependências declaradas de uma skill (Fase 3)."""
+        func = self.registry.get(name)
+        return getattr(func, "_skill_dependencies", []) if func else []
+
+    def get_all_skills_with_meta(self) -> List[Dict[str, Any]]:
+        """Retorna lista de skills com metadados para diagnóstico."""
+        result = []
+        for schema in self.schemas:
+            name = schema["function"]["name"]
+            deps = self.get_dependencies(name)
+            result.append({
+                "name": name,
+                "description": schema["function"]["description"],
+                "dependencies": deps,
+                "schema": schema
+            })
+        return result
 
 skill_registry = SkillRegistry()
 skill = skill_registry.register

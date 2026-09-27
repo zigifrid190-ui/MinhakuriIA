@@ -1,100 +1,108 @@
-# 🤖 Kuri IA — Seu Assistente Desktop Pessoal (Jarvis Mode)
+# Kuri IA — presença no desktop
 
-![Status](https://img.shields.io/badge/Status-v1.2_Cognitive_Update-blue?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Corpo_0.7-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6-darkblue?style=for-the-badge)
 ![Privacidade](https://img.shields.io/badge/Privacidade-Local__First-orange?style=for-the-badge)
 
-A **Kuri** é uma assistente virtual autônoma projetada para viver diretamente no seu desktop Windows. Inspirada na filosofia de um "Jarvis pessoal com alma", ela combina inteligência artificial avançada (Grok/Ollama) com uma interface visual viva (Gamer HUD minimalista), permitindo interações rápidas por voz enquanto executa tarefas de forma integrada no seu sistema operacional.
+A **Kuri** é uma presença no teu Windows: cara, voz, personalidade. O projeto e a IA se chamam **Kuri**. Antes o nome era Shogun — inspirado na VTuber IA do Miyauti. O nome mudou; a tese (alguém no desktop, não um chatbot) não.
+
+Não é um chatbot de navegador. Não é um sistema operacional pessoal. É alguém no setup que, quando precisa, mexe no PC.
+
+**Origem, em camadas:**
+
+- **Shogun / Miyauti** — motivo da criação (nome antigo do projeto; o nome atual é Kuri)
+- **Assistente no PC** — usabilidade (sair do chat e agir)
+- **PAI** — só jeito de pensar estrutura (skills, memória)
+- **Megumin, Gwen, Cissia** — corpo e voz da personagem
+
+Plano oficial e passo a passo: **[KURI_ROADMAP.md](./KURI_ROADMAP.md)**.
 
 ---
 
-## 🌟 O que a Kuri faz hoje (v0.5)
+## O que ela faz hoje
 
-A Kuri evoluiu de um simples chatbot para uma aplicação desktop nativa ultrarrápida:
+Corpo quase fechado; alma e mãos ainda no meio do caminho.
 
-- **🎙️ Ciclo de Voz Otimizado:** Transcrição instantânea via `faster-whisper` (local-first com filtro VAD e detecção de silêncio de 1.0s) garantindo que seus dados de áudio não sejam enviados para a nuvem.
-- **🔊 Voz Premium com Cache:** Integração nativa com a voz profissional da **ElevenLabs** (com sistema de cache local em `tts_cache/` para economizar créditos) e fallback automático para `edge-tts` gratuito.
-- **🧠 Cérebro Inteligente (Brain):** Conectada ao Grok-4 (xAI) com **Function Calling**, permitindo à Kuri decidir autonomamente quando conversar ou quando executar comandos no seu PC.
-- **🖥️ Controle do Sistema:** Possui ações nativas cadastradas para abrir/fechar apps, fazer pesquisas na web, consultar hora/data, criar/abrir pastas do sistema, tirar prints e controlar o volume do Windows em tempo real.
-- **🔌 Framework de Skills Dinâmicas & Hooks (NOVO):** Arquitetura totalmente desacoplada sob `kuri_skills/` permitindo carregar, atualizar e adicionar novas habilidades (ações) em tempo de execução via comando de voz (`recarregar_skills`). Possui ganchos (Hooks) integrados para logar e persistir cada ação de forma auditável no SQLite para aprendizado contínuo.
-- **✨ Interface Viva (Gamer HUD):** Janela flutuante desenvolvida em **PyQt6** com avatares que reagem dinamicamente a 5 estados emocionais mapeados pelo LLM.
-- **🧠 Upgrades Cognitivos (NOVO):**
-    - **Consciência Temporal:** Ela agora entende o momento do dia (manhã, tarde, noite, madrugada) e adapta seu comportamento.
-    - **Prosódia Emocional:** A voz da Kuri muda de tom, velocidade e estilo dependendo da emoção detectada.
-    - **Micro-Proatividade:** Motor de rotinas que permite à Kuri quebrar o silêncio e interagir espontaneamente com você.
-    - **Memória de Longo Prazo:** Migração total para **SQLite** com busca por relevância e resumos automáticos de sessões para um contexto infinito.
+- **Voz local:** `faster-whisper` + VAD. Áudio não vai pra nuvem.
+- **Fala:** ElevenLabs (cache em `tts_cache/`) com fallback `edge-tts`.
+- **Cérebro:** Grok (xAI) com function calling; fallback Ollama se a API cair.
+- **Mãos:** skills em `kuri_skills/` (apps, volume, print, git, tarefas…). O widget agora envia as tools no stream — ela deve *fazer*, não só falar.
+- **Cara:** widget PyQt6 + Live2D (MP4 só como fallback), 5 emoções.
+- **Sono:** depois de um tempo quieta, idle baixo. Acorda com “acorda kuri”, “ei kuri”.
+- **Memória:** SQLite (histórico, fatos, resumos, tarefas).
+- **Conversa:** depois que você chama ela, a janela fica aberta um tempo — não precisa repetir o nome a cada frase.
+
+O que ainda **não** é verdade (de propósito, até o movimento certo):
+
+- Lip sync real (a boca ainda é procedural)
+- Visão da tela
+- Gírias persistentes dela (Kurês)
+- YouTube/Twitter ao vivo (Reddit sim; o resto ela admite que não sabe)
+- Controle remoto do PC — **fora do norte**
 
 ---
 
-## 🚀 Como Usar
+## Como usar
 
 ### Pré-requisitos
 - Windows 10/11
 - Python 3.10 ou superior
-- Microfone e alto-falantes configurados
+- Microfone e alto-falantes
 
-### Instalação (Modo Desenvolvimento)
-1. Clone este repositório:
-   ```bash
-   git clone https://github.com/teu-usuario/MinhakuriIA.git
-   cd MinhakuriIA
-   ```
-2. Crie e ative o ambiente virtual:
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-3. Instale as dependências:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Crie um arquivo `.env` na raiz baseado no exemplo e insira suas credenciais:
-   ```env
-   GROK_API_KEY=sua_chave_grok
-   ELEVENLABS_API_KEY=sua_chave_elevenlabs
-   ELEVENLABS_VOICE_ID=id_da_voz_escolhida
-   USE_PREMIUM_TTS=true
-   ```
-5. **Prepare os assets pesados** (modelos e arquivos de avatar):
-   ```powershell
-   # Execute o script de preparação (recomendado)
-   .\scripts\download_assets.ps1
-   ```
-   > **Importante:** Alguns arquivos (modelo Whisper, Live2D e vídeos do avatar) são muito grandes e **não estão no Git**.
-   > O script irá te guiar sobre o que precisa ser baixado ou restaurado manualmente.
+### Desenvolvimento
+1. Clone o repositório e entre na pasta.
+2. `python -m venv venv` e `.\venv\Scripts\activate`
+3. `pip install -r requirements.txt`
+4. `.env` na raiz:
 
-6. Inicie a assistente:
-   ```bash
-   python kuri_desktop.py
-   ```
+```env
+GROK_API_KEY=sua_chave_grok
+ELEVENLABS_API_KEY=sua_chave_elevenlabs
+ELEVENLABS_VOICE_ID=id_da_voz_escolhida
+USE_PREMIUM_TTS=true
 
-### Usando o Executável Compilado (.exe)
-1. Acesse a pasta `dist/KuriIA/`.
-2. Execute `KuriIA.exe`.
-3. Clique no ícone de engrenagem ⚙️ na barra inferior do widget para configurar seus dispositivos de entrada/saída de áudio, ajustar volume ou alternar entre o TTS Premium e Gratuito.
+KURI_PERF_MODE=low
+LAZY_STT=true
+SLEEP_TIMEOUT_MINUTES=5
+```
+
+5. Assets pesados (Whisper, Live2D, vídeos): `.\scripts\download_assets.ps1`
+6. Subir a presença:
+
+```bash
+python kuri_desktop.py
+```
+
+`python main.py` ainda abre o CLI antigo. O alvo é um único core (`kuri_core.py`).  
+`python app.py` foi aposentado (era FastAPI + HeyGen).
+
+### Executável
+`dist/KuriIA/KuriIA.exe` — engrenagem ⚙️ para mic, saída e TTS.
 
 ---
 
-## 🗺️ Roadmap de Evolução (v2.0+)
+## Para onde vamos
 
-O desenvolvimento da Kuri segue uma filosofia inspirada na arquitetura **PAI (Personal AI Infrastructure)** de Daniel Miessler, focando em transformá-la em um verdadeiro sistema operacional pessoal inteligente. 
+Quatro movimentos, nesta ordem. Detalhe e checklists no roadmap.
 
-Para ver todos os detalhes técnicos, tarefas e checklists de cada etapa, consulte nosso documento oficial: **[KURI_ROADMAP.md](./KURI_ROADMAP.md)**.
+1. **Fechar o corpo** — widget age de verdade, ela fica na conversa, lip sync, um loop só
+2. **Fazer ela ser ela** — Kurês, identidade viva, memória de relação, proatividade contextual
+3. **Mãos no teu mundo** — visão da tela, poucas skills profundas, Ollama com tools
+4. **Evolução visível** — skin/voz nova de vez em quando; ela comenta o próprio upgrade
 
-### Resumo dos Sprints:
-- **Sprint 1: Performance e Voz** — ✅ CONCLUÍDO. Integração ElevenLabs, cache local e latência otimizada.
-- **Sprint 2: Inteligência e Memória** — ✅ CONCLUÍDO. SQLite, resumos automáticos, busca por relevância, calibração de microfone e aprendizado ativo de perfil.
-- **Sprint 3: Visual Premium e Rotinas** — ✅ CONCLUÍDO. Redesign completo (gradientes, glow, modo compacto) e motor de rotinas proativo 100% ativo.
-- **Sprint 4: Inteligência Autônoma** — ✅ CONCLUÍDO. Implementação do algoritmo PAI completo (`OBSERVE → THINK → PLAN → BUILD → EXECUTE → VERIFY → LEARN`), loop de auto-melhoria contínua, encadeamento de múltiplas ações (tool chains), metaprogramação e suíte de testes de resiliência integrada (36 testes).
-- **Sprint 5: Integrações Externas** — 🟡 EM PROGRESSO. Módulos de apoio a projetos do Antigravity (Git status, commits) e monitoramento social proativo.
-- **Sprint 6: Jarvis Completo** — Fallback offline-first nativo via **Ollama** (Llama 3 / Qwen 2.5) em caso de queda de internet, visão computacional da tela e **Área de Trabalho Remota** segura (FastAPI + WebSockets + 2FA) para controlar o PC via smartphone.
+**Não está no plano:** remote, 2FA, ngrok, packs, Telos.
+
+Próximos 14 dias: ela executa skill no widget, conversa duas falas sem ouvir o nome, e o repo não se vende como Jarvis.
+
+---
+
+## Privacidade
+
+STT e VAD rodam na máquina. Histórico e perfil ficam em SQLite local. Nada disso é vendido nem enviado como produto.
+
+Correção do visual de sono: `docs/SLEEP_MODE_FIX.md`.
 
 ---
 
-## 🔒 Privacidade e Licença
-
-A Kuri foi construída com a privacidade como prioridade fundamental. A detecção de voz e o processamento de áudio local rodam estritamente na sua máquina. O histórico de interações e o perfil de personalidade são salvos localmente em arquivos JSON/SQLite e nunca são compartilhados ou vendidos.
-
----
-*Forjado no Olimpo para ser a assistente definitiva do teu setup.*
+*Presença primeiro. Ferramenta depois. Alma no meio — como a personalidade dela exige.*

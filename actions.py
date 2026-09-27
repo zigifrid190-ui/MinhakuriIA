@@ -46,14 +46,14 @@ def load_dynamic_skills():
             module_name = f"kuri_skills.{filename[:-3]}"
             try:
                 if module_name in sys.modules:
-                    # Recarrega o módulo se ele já tiver sido importado anteriormente
                     importlib.reload(sys.modules[module_name])
                     log.info(f"Skill recarregada: {module_name}")
                 else:
                     importlib.import_module(module_name)
                     log.info(f"Skill importada: {module_name}")
             except Exception as e:
-                log.error(f"Erro ao carregar módulo de skill '{module_name}': {e}")
+                log.error(f"Erro ao carregar skill '{module_name}': {e}")
+                # Continua carregando as demais skills (robustez Fase 1)
 
     # Atualiza as referências locais com os dados do registro central
     REGISTRY.clear()
@@ -69,6 +69,26 @@ def load_dynamic_skills():
 
     log.info(f"Carregamento concluído! {len(REGISTRY)} skills prontas para uso.")
 
+    # Fase 3: Verificação e log de dependências (aprofundado)
+    try:
+        missing_deps = []
+        resolved_count = 0
+        for name in REGISTRY:
+            deps = skill_registry.get_dependencies(name)
+            resolved = True
+            for d in deps:
+                if d not in REGISTRY:
+                    missing_deps.append(f"'{name}' -> '{d}'")
+                    resolved = False
+            if resolved and deps:
+                resolved_count += 1
+        if missing_deps:
+            log.warning(f"Dependências não resolvidas: {missing_deps}")
+        else:
+            log.info(f"Todas as dependências declaradas estão resolvidas. ({resolved_count} skills com deps ok)")
+    except Exception as e:
+        log.error(f"Erro ao checar dependências: {e}")
+
 # ===== Definição de Hooks Padrão =====
 
 def _log_pre_hook(name: str, args: dict):
@@ -77,7 +97,7 @@ def _log_pre_hook(name: str, args: dict):
 def _log_post_hook(name: str, args: dict, result: any):
     log.info(f"[HOOK POST] Ferramenta '{name}' finalizada. Resultado: {result}")
     
-    # Salva no banco de dados SQLite para fins de auditoria e aprendizado contínuo (Padrão PAI)
+    # Auditoria de ações no SQLite (o que ela fez, não só o que falou)
     try:
         memory.adicionar_historico_acao(nome_acao=name, argumentos=args, resultado=result)
     except Exception as e:

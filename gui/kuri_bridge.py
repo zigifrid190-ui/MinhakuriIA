@@ -19,6 +19,7 @@ class KuriState(Enum):
     LISTENING = auto()
     THINKING = auto()
     SPEAKING = auto()
+    SLEEPING = auto()   # Modo sono / suspenso - baixo consumo
     ERROR = auto()
 
 
@@ -40,6 +41,7 @@ class KuriBridge:
 
         self._state = KuriState.IDLE
         self._emotion = "neutral"
+        self._mouth_open = 0.0
         self._lock = threading.Lock()
 
     # ── Estado ──────────────────────────────────────────────────────────────
@@ -74,6 +76,19 @@ class KuriBridge:
     def on_emotion(self, callback):
         """Registra callback da GUI para receber mudanças de emoção."""
         self._emotion_callbacks.append(callback)
+
+    # ── Boca (lip sync) ───────────────────────────────────────────────────────
+
+    @property
+    def mouth_open(self) -> float:
+        with self._lock:
+            return self._mouth_open
+
+    def set_mouth(self, value: float):
+        """0.0 fechada … 1.0 aberta. Chamado pelo TTS a cada frame de áudio."""
+        clamped = max(0.0, min(1.0, float(value)))
+        with self._lock:
+            self._mouth_open = clamped
 
     # ── Texto da Kuri ────────────────────────────────────────────────────────
 

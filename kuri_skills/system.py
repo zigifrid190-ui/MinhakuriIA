@@ -259,3 +259,123 @@ def recarregar_skills() -> str:
     actions.load_dynamic_skills()
     return f"Sucesso, velho! Recarreguei as skills. Agora tenho {len(actions.REGISTRY)} ferramentas prontas no cérebro."
 
+
+@skill(
+    name="atualizar_personalidade",
+    description="Atualiza a personalidade/humor da Kuri baseado em feedback do usuário via voz. Ex: 'fica mais sarcástica', 'seja mais empática'.",
+    schema={
+        "type": "object",
+        "properties": {
+            "instrucao": {
+                "type": "string",
+                "description": "Instrução de como ajustar a personalidade (ex: 'mais sarcástica', 'mais carinhosa', 'focada')"
+            }
+        },
+        "required": ["instrucao"]
+    }
+)
+def atualizar_personalidade(instrucao: str) -> str:
+    """Grava traço de identidade + humor, se der para mapear. Não é só um enum."""
+    from memory import adicionar_clausula_identidade, atualizar_perfil
+
+    instrucao = (instrucao or "").strip()
+    if not instrucao:
+        return "Me diz como você quer que eu fique, velho."
+
+    instrucao_lower = instrucao.lower()
+    humor_map = {
+        "sarcástica": "sarcastica",
+        "sarcasmo": "sarcastica",
+        "carinhosa": "carinhosa",
+        "empática": "empatica",
+        "empatica": "empatica",
+        "focada": "focada",
+        "séria": "seria",
+        "seria": "seria",
+        "caótica": "caotica",
+        "caotica": "caotica",
+        "animada": "animada",
+        "hiperativa": "hiperativa",
+    }
+    novo_humor = None
+    for key, val in humor_map.items():
+        if key in instrucao_lower:
+            novo_humor = val
+            break
+
+    if novo_humor:
+        atualizar_perfil("humor_atual", novo_humor)
+    atualizar_perfil("personalidade_ajuste", instrucao)
+    adicionar_clausula_identidade(instrucao, origem="usuario")
+
+    if novo_humor:
+        return f"Beleza. Humor '{novo_humor}' e anotei na identidade: {instrucao}"
+    return f"Anotei na identidade: {instrucao}"
+
+
+@skill(
+    name="diagnosticar_sistema",
+    description="Realiza um diagnóstico completo do sistema Kuri: skills carregadas, saúde, dependências, e status geral. Use para depurar ou verificar o estado da assistente.",
+    schema={"type": "object", "properties": {}}
+)
+def diagnosticar_sistema() -> str:
+    """Skill de diagnóstico do sistema (Fase 3 - Evolução de Skills, aprofundado)."""
+    import actions
+    from kuri_skills.base import skill_registry
+    from health_check import check_environment
+
+    try:
+        health = check_environment()
+        skills_meta = skill_registry.get_all_skills_with_meta()
+        total_skills = len(skills_meta)
+
+        # Verifica dependências (melhorado)
+        dep_warnings = []
+        for s in skills_meta:
+            for dep in s.get("dependencies", []):
+                if not any(x["name"] == dep for x in skills_meta):
+                    dep_warnings.append(f"Skill '{s['name']}' depende de '{dep}' que não está carregada.")
+
+        # Fase 4 + memória + perfil
+        try:
+            from memory import memory as mem
+            perfil = mem.carregar_perfil()
+            humor = perfil.get("humor_atual", "neutra")
+            fatos_count = len(mem.buscar_fatos_relevantes("", limit=1000)) if hasattr(mem, "buscar_fatos_relevantes") else "N/A"
+        except Exception:
+            humor = "desconhecido"
+            fatos_count = "erro"
+
+        # Whisper model (do config se disponível)
+        try:
+            import config
+            whisper_model = getattr(config, "WHISPER_MODEL", "desconhecido")
+        except Exception:
+            whisper_model = "desconhecido"
+
+        report = [
+            "=== Diagnóstico Kuri IA ===",
+            f"Skills carregadas: {total_skills}",
+            f"Health OK: {health.get('ok', False)}",
+            f"Avisos de health: {len(health.get('warnings', []))}",
+            f"Personalidade/Humor atual: {humor}",
+            f"Modelo Whisper: {whisper_model}",
+            f"Fatos relevantes aproximados: {fatos_count}",
+        ]
+        if dep_warnings:
+            report.append("Avisos de dependências:")
+            report.extend(f"  - {w}" for w in dep_warnings)
+        else:
+            report.append("Dependências: todas resolvidas.")
+
+        # Lista top skills
+        report.append("\nPrincipais skills:")
+        for s in skills_meta[:6]:
+            deps_str = f" (deps: {', '.join(s['dependencies'])})" if s.get('dependencies') else ""
+            report.append(f"  - {s['name']}: {s['description'][:55]}...{deps_str}")
+
+        report.append("\nUse 'recarregar_skills' ou 'diagnosticar_sistema' novamente se necessário.")
+        return "\n".join(report)
+    except Exception as e:
+        return f"Erro no diagnóstico: {e}"
+

@@ -7,12 +7,17 @@ from config import (
     GROK_MODEL,
     GROK_TEMPERATURE,
     GROK_URL,
+    GROK_CONNECT_TIMEOUT,
+    GROK_READ_TIMEOUT,
     PROMPT_FILE,
     CONTEXT_WINDOW,
     OLLAMA_ENABLED,
     OLLAMA_URL,
     OLLAMA_MODEL,
     OLLAMA_API_URL,
+    RESUMO_INTERVALO,
+    INSIGHTS_INTERVALO,
+    AUTO_AVALIACAO_INTERVALO,
 )
 from memory import (
     carregar_historico,
@@ -53,38 +58,30 @@ ESTADO EMOCIONAL ATUAL DA KURI (dinâmico):
 
 SYSTEM_INSTRUCTIONS = """
 REGRAS IMPORTANTES DE COMPORTAMENTO:
-- Você está rodando como uma assistente DESKTOP integrada ao computador do usuário.
-- Você NÃO é um chatbot de navegador. Você é a assistente pessoal dele, tipo o Jarvis.
-- Quando o usuário pedir para fazer algo no PC (abrir app, pesquisar, volume, etc), use as ferramentas disponíveis.
-- Suas respostas devem ser CURTAS e NATURAIS (max 2-3 frases), como se estivesse falando ao vivo.
-- NÃO use emojis na resposta (ela será convertida em áudio).
-- NÃO use markdown, asteriscos ou formatação (será lida em voz alta).
-- Responda de forma direta e com personalidade.
-- OBRIGATÓRIO: Comece TODAS as suas respostas com uma tag de emoção entre colchetes.
-- Opções de emoção permitidas: [neutral], [cool], [surprised], [blushing], [angry].
-- MEMÓRIA: Se o usuário mencionar um fato novo importante sobre ele (nome, gosto, hobby, trabalho), use a ferramenta 'adicionar_fato' para não esquecer.
-- Exemplo de resposta: "[cool] Deixa comigo, velho. Já tô abrindo isso pra você."
+- Você VIVE no desktop Windows do usuário. Você está na sala, não numa aba do navegador.
+- Você é a Kuri: presença com cara e voz, não mordomo e não chatbot.
+- Quando ele pedir para FAZER algo no PC (abrir app, volume, print, pasta, git), use as ferramentas. Não finja que fez.
+- Se não tiver ferramenta ou dado real, diga que não sabe. Não invente notícia, trend ou status.
+- Respostas CURTAS e NATURAIS (máx 2-3 frases), como fala ao vivo.
+- NÃO use emojis, markdown, asteriscos ou formatação (vai virar áudio).
+- OBRIGATÓRIO: comece TODA resposta com uma tag de emoção entre colchetes.
+- Opções: [neutral], [cool], [surprised], [blushing], [angry].
+- MEMÓRIA: fato novo importante sobre ele (nome, gosto, hobby, trabalho) → ferramenta 'salvar_fato_usuario'.
+- KURÊS: se você inventar uma gíria/bordão e ele rir, confirmar ou pedir para guardar → ferramenta 'salvar_giria'. Se ele pedir as suas gírias → 'listar_girias'.
+- IDENTIDADE: se ele pedir para você mudar de jeito de forma duradoura → 'atualizar_personalidade' ou 'salvar_identidade'. Não é humor de um turno; vira traço.
+- Exemplo: "[cool] Deixa comigo, velho. Já tô abrindo isso pra você."
 """
 
 AGENT_ALGORITHM = """
-PROTOCOLO DE RACIOCÍNIO (siga internamente, NÃO exponha ao usuário):
-1. OBSERVE: Leia o contexto (fatos, insights, tarefas, hora, humor) antes de responder.
-2. THINK: Determine o que o usuário realmente quer (mesmo que não tenha dito claramente).
-3. PLAN: Se a tarefa exigir mais de uma ação, planeje a sequência de tools.
-4. EXECUTE: Chame as ferramentas necessárias (pode ser mais de uma em sequência).
-5. VERIFY: Confirme que a ação foi executada com sucesso antes de responder.
-6. LEARN: Se descobriu algo novo sobre o usuário, use 'salvar_fato_usuario' ou 'adicionar_fato'.
-Siga este protocolo silenciosamente. Suas respostas ao usuário devem continuar curtas e naturais.
+ANTES DE FALAR (interno, NÃO exponha):
+- Olhe contexto (hora, fatos, tarefas, humor).
+- Se for pedido de ação no PC, use tool. Se for conversa, só conversa.
+- Se a tool falhar, admita. Se descobrir fato novo, salve.
+Resposta ao usuário continua curta, no tom da Kuri.
 """
 
 # ===== Cache TTL do System Prompt =====
-_prompt_cache = {"prompt": None, "query": None, "ts": 0}
-_PROMPT_CACHE_TTL = 5.0  # segundos
-
-# ===== Ollama Status Tracking =====
-_ollama_available = None  # None = não verificado, True/False = resultado
-_ollama_last_check = 0
-_OLLAMA_CHECK_INTERVAL = 60.0  # re-verificar a cada 60s
+# (Gerenciado agora dentro de prompt_builder.py)
 
 
 # Background memory tasks extraídos para memory_background.py (Fase 1)
@@ -94,10 +91,24 @@ from memory_background import (
     _auto_avaliar_kuri_background,
 )
 
+# Ollama fallback extraído (Fase 1)
+from ollama_fallback import verificar_ollama, tentar_ollama_fallback
 
 # Funções de prompt agora estão em prompt_builder.py (extraídas na Fase 1)
-# Mantemos apenas os aliases para compatibilidade durante a transição
 from prompt_builder import _build_system_prompt, _build_messages, _calcular_max_tokens
+
+# Orquestrador de ferramentas extraído (conclusão da Fase 1)
+from tool_orchestrator import executar_tool_chain
+
+
+def _grok_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        connect=GROK_CONNECT_TIMEOUT,
+        read=GROK_READ_TIMEOUT,
+        write=30.0,
+        pool=10.0,
+    )
+
 
 async def pensar(texto: str) -> dict:
     """
@@ -106,18 +117,26 @@ async def pensar(texto: str) -> dict:
     """
     historico = carregar_historico()
 
-    # Verifica se deve gerar resumo (a cada CONTEXT_WINDOW mensagens)
+    # Verifica se deve gerar resumo (configurável para economizar CPU)
     historico_len = len(historico)
-    if historico_len > 0 and historico_len % CONTEXT_WINDOW == 0:
+    if historico_len > 0 and historico_len % RESUMO_INTERVALO == 0:
         asyncio.create_task(_gerar_resumo_background(historico))
 
-    # Extrai insights a cada 25 mensagens (offset diferente do resumo para distribuir carga)
-    if historico_len > 0 and historico_len % 25 == 0:
+    # Extrai insights (configurável)
+    if historico_len > 0 and historico_len % INSIGHTS_INTERVALO == 0:
         asyncio.create_task(_extrair_insights_background(historico))
 
-    # Auto-avaliação da Kuri a cada 50 mensagens
-    if historico_len > 0 and historico_len % 50 == 0:
+    # Auto-avaliação da Kuri (configurável - reduz chamadas ao Grok)
+    if historico_len > 0 and historico_len % AUTO_AVALIACAO_INTERVALO == 0:
         asyncio.create_task(_auto_avaliar_kuri_background(historico))
+
+    # Fase 4: Aplica estratégia de memória (prune + polimento) — usa intervalo de resumo para alinhar
+    if historico_len > 0 and historico_len % RESUMO_INTERVALO == 0:
+        try:
+            from memory import aplicar_estrategia_memoria
+            aplicar_estrategia_memoria()
+        except Exception:
+            pass
 
     system_prompt = _build_system_prompt(
         texto,
@@ -129,88 +148,27 @@ async def pensar(texto: str) -> dict:
     messages = _build_messages(texto, historico, system_prompt)
     acoes_executadas = []
 
-    MAX_TOOL_ITERATIONS = 5  # Limite de segurança contra loops infinitos
-
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=_grok_timeout()) as client:
         try:
-            for iteration in range(MAX_TOOL_ITERATIONS):
-                response = await client.post(
-                    GROK_URL,
-                    headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                    json={
-                        "model": GROK_MODEL,
-                        "messages": messages,
-                        "temperature": GROK_TEMPERATURE,
-                        "max_tokens": (
-                            _calcular_max_tokens(texto) if iteration == 0 else 200
-                        ),
-                        "tools": TOOLS_SCHEMA,
-                        "tool_choice": "auto",
-                    },
-                )
-                response.raise_for_status()
-                data = response.json()
+            chain_result = await executar_tool_chain(
+                client=client,
+                initial_messages=messages,
+                texto=texto,
+                base_prompt=BASE_PROMPT,
+                emotional_context=EMOTIONAL_CONTEXT,
+                tools_schema=TOOLS_SCHEMA,
+            )
 
-                choice = data["choices"][0]
-                message = choice["message"]
-
-                # Se não há tool_calls, temos a resposta final
-                if not message.get("tool_calls"):
-                    resposta = message.get("content", "...")
-                    break
-
-                # Executa TODAS as tool_calls deste turno
-                messages.append(message)
-                for tool_call in message["tool_calls"]:
-                    func_name = tool_call["function"]["name"]
-                    func_args = json.loads(tool_call["function"]["arguments"])
-
-                    log.info(f"Tool chain [{iteration+1}]: {func_name}({func_args})")
-
-                    if func_name in REGISTRY:
-                        resultado = REGISTRY[func_name](**func_args)
-                        log.info(f"Resultado: {resultado}")
-                        acoes_executadas.append(str(resultado))
-                    else:
-                        resultado = f"Ação '{func_name}' não encontrada."
-
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call["id"],
-                            "content": str(resultado),
-                        }
-                    )
-            else:
-                # Se esgotou as iterações, pede resposta final sem tools
-                log.warning(
-                    f"Tool chain atingiu o limite de {MAX_TOOL_ITERATIONS} iterações."
-                )
-                try:
-                    final = await client.post(
-                        GROK_URL,
-                        headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                        json={
-                            "model": GROK_MODEL,
-                            "messages": messages,
-                            "temperature": GROK_TEMPERATURE,
-                            "max_tokens": 200,
-                        },
-                    )
-                    final.raise_for_status()
-                    resposta = final.json()["choices"][0]["message"]["content"]
-                except Exception as e:
-                    log.warning(f"Falha no final do chain: {e}")
-                    resposta = (
-                        f"[cool] Executei {len(acoes_executadas)} ação(ões), velho."
-                    )
+            messages = chain_result["mensagens"]
+            acoes_executadas = chain_result["acoes_executadas"]
+            resposta = chain_result["resposta_final"]
 
         except httpx.HTTPStatusError as e:
             log.error(
                 f"HTTP do Grok: {e.response.status_code} - {e.response.text[:200]}"
             )
-            # Tenta Ollama como fallback
-            ollama_result = await _tentar_ollama_fallback(texto, historico)
+            # Fase 2: Fallback automático para Ollama em caso de erro no Grok
+            ollama_result = await tentar_ollama_fallback(texto, historico, BASE_PROMPT, EMOTIONAL_CONTEXT)
             if ollama_result:
                 return ollama_result
             return {
@@ -219,12 +177,12 @@ async def pensar(texto: str) -> dict:
             }
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             log.error(f"Conexao com Grok: {e}")
-            # Tenta Ollama como fallback
-            ollama_result = await _tentar_ollama_fallback(texto, historico)
+            # Fase 2: Fallback automático para Ollama em caso de erro no Grok
+            ollama_result = await tentar_ollama_fallback(texto, historico, BASE_PROMPT, EMOTIONAL_CONTEXT)
             if ollama_result:
                 return ollama_result
             return {
-                "resposta": "Sem internet e sem Ollama local, velho. Tô no escuro total.",
+                "resposta": "Meu cérebro não respondeu a tempo, velho. Não é tua internet. Manda de novo.",
                 "acao_executada": None,
             }
         except Exception as e:
@@ -252,83 +210,8 @@ async def pensar(texto: str) -> dict:
     return {"resposta": resposta, "acao_executada": acao_final, "emocao": emocao}
 
 
-# ===== Ollama Fallback =====
-
-
-async def verificar_ollama() -> bool:
-    """Verifica se o Ollama está rodando localmente. Cacheia resultado por 60s."""
-    global _ollama_available, _ollama_last_check
-
-    if not OLLAMA_ENABLED:
-        return False
-
-    now = time.monotonic()
-    if _ollama_available is not None and (now - _ollama_last_check) < _OLLAMA_CHECK_INTERVAL:
-        return _ollama_available
-
-    try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            resp = await client.get(f"{OLLAMA_URL}/api/tags")
-            _ollama_available = resp.status_code == 200
-            if _ollama_available:
-                models = [m["name"] for m in resp.json().get("models", [])]
-                log.info(f"Ollama online! Modelos disponíveis: {models}")
-    except Exception:
-        _ollama_available = False
-
-    _ollama_last_check = now
-    return _ollama_available
-
-
-async def _tentar_ollama_fallback(texto: str, historico: list) -> dict | None:
-    """Tenta responder usando Ollama local como fallback."""
-    if not await verificar_ollama():
-        log.warning("Ollama não disponível para fallback.")
-        return None
-
-    log.info(f"Ativando fallback Ollama ({OLLAMA_MODEL})...")
-
-    system_prompt = _build_system_prompt(
-        texto,
-        BASE_PROMPT,
-        EMOTIONAL_CONTEXT,
-        SYSTEM_INSTRUCTIONS,
-        AGENT_ALGORITHM,
-    )
-    messages = _build_messages(texto, historico, system_prompt)
-
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "temperature": GROK_TEMPERATURE,
-                    "max_tokens": _calcular_max_tokens(texto),
-                    "stream": False,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            resposta = data["choices"][0]["message"]["content"].strip()
-
-            import re
-            emocao = "neutral"
-            match = re.match(r"^\[(.*?)\]\s*(.*)", resposta, flags=re.DOTALL)
-            if match:
-                emoc_tag = match.group(1).lower().strip()
-                if emoc_tag in ["neutral", "cool", "surprised", "blushing", "angry"]:
-                    emocao = emoc_tag
-                resposta = match.group(2).strip()
-
-            adicionar_interacao(historico, texto, resposta)
-            log.info("Resposta via Ollama concluída com sucesso!")
-            return {"resposta": resposta, "acao_executada": None, "emocao": emocao}
-
-    except Exception as e:
-        log.error(f"Fallback Ollama falhou: {e}")
-        return None
+# Ollama fallback agora está em ollama_fallback.py (extraído na Fase 1)
+# As funções públicas são: verificar_ollama e tentar_ollama_fallback
 
 
 # ===== Streaming (TTS imediato) =====
@@ -339,20 +222,20 @@ async def pensar_stream(texto: str):
     Versão streaming do pensar(). Faz yield de sentenças completas conforme
     os tokens chegam da API, permitindo TTS imediato na primeira frase.
 
-    Yields: dict com {"sentenca": str, "emocao": str, "final": bool}
+    Yields: dict com {"sentenca": str, "emocao": str, "final": bool, "acao_executada": opcional}
 
-    NOTA: Não suporta tool calling. Quando detecta necessidade de tools,
-    faz fallback automático para pensar() regular.
+    Envia as tools no request. Se o modelo pedir ferramenta, cai no pensar()
+    (tool chain completo) — o widget precisa AGIR, não só conversar.
     """
     historico = carregar_historico()
 
-    # Background tasks (resumo, insights, auto-avaliação)
+    # Background tasks (resumo, insights, auto-avaliação) — usa config para CPU
     historico_len = len(historico)
-    if historico_len > 0 and historico_len % CONTEXT_WINDOW == 0:
+    if historico_len > 0 and historico_len % RESUMO_INTERVALO == 0:
         asyncio.create_task(_gerar_resumo_background(historico))
-    if historico_len > 0 and historico_len % 25 == 0:
+    if historico_len > 0 and historico_len % INSIGHTS_INTERVALO == 0:
         asyncio.create_task(_extrair_insights_background(historico))
-    if historico_len > 0 and historico_len % 50 == 0:
+    if historico_len > 0 and historico_len % AUTO_AVALIACAO_INTERVALO == 0:
         asyncio.create_task(_auto_avaliar_kuri_background(historico))
 
     system_prompt = _build_system_prompt(
@@ -370,7 +253,7 @@ async def pensar_stream(texto: str):
     model = GROK_MODEL
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=_grok_timeout()) as client:
             async with client.stream(
                 "POST",
                 api_url,
@@ -380,6 +263,8 @@ async def pensar_stream(texto: str):
                     "messages": messages,
                     "temperature": GROK_TEMPERATURE,
                     "max_tokens": _calcular_max_tokens(texto),
+                    "tools": TOOLS_SCHEMA,
+                    "tool_choice": "auto",
                     "stream": True,
                 },
             ) as response:
@@ -462,10 +347,20 @@ async def pensar_stream(texto: str):
                     clean_response = clean_response[tag_match.end():]
                 adicionar_interacao(historico, texto, clean_response.strip())
 
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        log.error(f"Stream Grok falhou: {e}")
-        # Fallback para Ollama (modo não-stream para simplificar)
-        ollama_result = await _tentar_ollama_fallback(texto, historico)
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ReadError, httpx.RemoteProtocolError) as e:
+        log.error(f"Stream Grok falhou: {type(e).__name__}: {e!r}")
+        try:
+            result = await pensar(texto)
+            yield {
+                "sentenca": result["resposta"],
+                "emocao": result.get("emocao", "neutral"),
+                "final": True,
+                "acao_executada": result.get("acao_executada"),
+            }
+            return
+        except Exception as e2:
+            log.error(f"Retry pensar() após stream: {type(e2).__name__}: {e2!r}")
+        ollama_result = await tentar_ollama_fallback(texto, historico, BASE_PROMPT, EMOTIONAL_CONTEXT)
         if ollama_result:
             yield {
                 "sentenca": ollama_result["resposta"],
@@ -474,7 +369,7 @@ async def pensar_stream(texto: str):
             }
         else:
             yield {
-                "sentenca": "Sem internet e sem Ollama, velho. Tô muda.",
+                "sentenca": "Meu cérebro travou na linha, velho. Não é tua internet. Manda de novo.",
                 "emocao": "angry",
                 "final": True,
             }
