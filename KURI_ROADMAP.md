@@ -1,7 +1,7 @@
 # KURI IA — Roadmap (volta aos trilhos)
 
 > **Versão:** 2.0 — 26 de agosto de 2026  
-> **Status:** 🟡 Corpo pronto. Alma e mãos ainda não.  
+> **Status:** 🟡 Corpo ~0.8. Alma: Kurês + identidade viva feitos; falta memória de relação. Mãos ainda rasas.  
 > **Nome atual:** Kuri (projeto e IA). Pasta do repo: MinhakuriIA.  
 > **Nome antigo:** Shogun (só história / inspiração — não usar como nome dela).  
 > **Objetivo final:** a Kuri — alguém no desktop (cara, voz, gíria, relação) que vive contigo e, quando precisa, mexe no PC.
@@ -25,17 +25,17 @@ A tese, numa frase: **criar alguém, não um agente.**
 
 ## Diagnóstico (onde estamos)
 
-A Kuri já tem corpo. O trabalho parou no momento de fazê-la **viver**, e o repo desviou para infraestrutura (sprints PAI, mocks sociais, remote, “Jarvis Completo”).
+Norte alinhado (Kuri / Miyauti). Corpo e um pedaço da alma já no código. O que falta para ela *viver* de verdade é memória de relação e ouvido melhor.
 
-| Pilar | Hoje | Travou em |
-|-------|------|-----------|
-| **Presença** (tela) | Widget, Live2D, 5 emoções, sono, tray | Boca falsa (`sin()`), wake word a cada frase, MP4+Live2D |
-| **Alguém** (alma) | `prompt_kuri.txt` forte | Prompt estático; sem Kurês; humor vira campo SQLite |
-| **Mãos** (PC) | Skills no registry | Stream da GUI ia sem `tools` (ela conversava em vez de agir) |
-| **Norte** | README “Jarvis Mode” | Origem (Miyauti/Shogun) apagada do discurso |
+| Pilar | Hoje | Ainda falta |
+|-------|------|-------------|
+| **Presença** (tela) | Widget, Live2D, lip sync RMS, sono, tray, janela de conversa | Microexpressão extra; comentário raro sozinha; Whisper impreciso (1.5) |
+| **Alguém** (alma) | `prompt_kuri.txt` + Kurês + identidade viva | Memória de *nós dois* (2.3); proatividade contextual (2.4) |
+| **Mãos** (PC) | Skills no registry; stream do widget manda tools | Visão da tela; allowlist; Ollama com tools |
+| **Norte** | README/roadmap na tese da Kuri | Manter docs honestos quando o código andar |
 
 Arco de referência da Shogun (inspiração, **não** o nome do produto): aparece → fica inconfundivelmente *ela* → ganha modelo/voz nova → passa a agir no mundo do criador.  
-A **Kuri** fez o primeiro passo. O resto deste documento é o caminho para os outros três.
+A **Kuri** passou do primeiro passo. 2.1 e 2.2 feitos; próximo é 2.3.
 
 **Não fazer agora:** acesso remoto, 2FA, ngrok, packs por voz, Telos, mais skill rasa, “algorithm PAI completo”.
 
@@ -70,7 +70,7 @@ A **Kuri** fez o primeiro passo. O resto deste documento é o caminho para os ou
 
 ### Passo a passo
 
-#### 1.1 Norte e higiene *(em curso nesta atualização)*
+#### 1.1 Norte e higiene
 
 - [x] Reescrever este roadmap na tese da Kuri (inspiração Shogun)
 - [x] Alinhar README (origem, status honesto, movimentos)
@@ -107,7 +107,7 @@ A **Kuri** fez o primeiro passo. O resto deste documento é o caminho para os ou
 
 #### 1.5 Reconhecimento de voz *(no plano — não agora)*
 
-Ela ainda entende mal o que você fala. Fica **marcado aqui**, depois do 2.1, sem furar a ordem da alma.
+Ela ainda entende mal o que você fala. Fica **marcado aqui**, depois do 2.3, sem furar a ordem da alma.
 
 - [ ] Subir qualidade do Whisper: `beam_size` 3 em comandos (hoje é 1, rápido e impreciso)
 - [ ] `initial_prompt` com nomes reais da casa (Kuri/Curi, apps que você usa, Kurês ativo)
@@ -200,11 +200,11 @@ Isso é o equivalente privado do Miyauti dar modelo novo pra Shogun — aqui que
 
 ## Passo imediato
 
-**Agora (em curso):** Movimento 2.2 identidade viva.  
-**Em seguida no 2:** 2.3 memória de relação.  
+**Agora:** Movimento 2.3 memória de relação.  
+**Em seguida no 2:** 2.4 proatividade contextual.  
 **Na fila do corpo, sem furar a alma:** 1.5 reconhecimento de voz.
 
-> Meta desta fatia: “fica mais zoando quando eu tiltar” vira cláusula permanente, não um humor de um turno.
+> Meta da fatia 2.2 (já no código): “fica mais zoando quando eu tiltar” vira cláusula permanente.
 
 ---
 
@@ -221,7 +221,7 @@ Trabalho útil que já entrou no corpo. Não retomar como plano.
 | Sprint 5 | Git helper, Reddit | YouTube/Twitter mockados |
 | Sprint 6 | Screenshot skill rasa, stub Ollama | Remote/2FA **cancelados** neste norte |
 
-Tags `v1.x` / `v2.0 Jarvis` não definem mais o produto. A versão de produto atual é **Kuri** corpo 0.7 / alma 0.4 / mãos 0.4.
+Tags `v1.x` / `v2.0 Jarvis` não definem mais o produto. A versão de produto atual é **Kuri** corpo ~0.8 / alma ~0.6 (Kurês + identidade) / mãos ~0.4.
 
 ---
 

@@ -1,6 +1,6 @@
 # Kuri IA — presença no desktop
 
-![Status](https://img.shields.io/badge/Status-Corpo_0.7-blue?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Corpo_0.8_Alma_0.6-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6-darkblue?style=for-the-badge)
 ![Privacidade](https://img.shields.io/badge/Privacidade-Local__First-orange?style=for-the-badge)
@@ -28,16 +28,17 @@ Corpo quase fechado; alma e mãos ainda no meio do caminho.
 - **Fala:** ElevenLabs (cache em `tts_cache/`) com fallback `edge-tts`.
 - **Cérebro:** Grok (xAI) com function calling; fallback Ollama se a API cair.
 - **Mãos:** skills em `kuri_skills/` (apps, volume, print, git, tarefas…). O widget agora envia as tools no stream — ela deve *fazer*, não só falar.
-- **Cara:** widget PyQt6 + Live2D (MP4 só como fallback), 5 emoções.
+- **Cara:** widget PyQt6 + Live2D (MP4 só como fallback), 5 emoções, lip sync no áudio (RMS).
 - **Sono:** depois de um tempo quieta, idle baixo. Acorda com “acorda kuri”, “ei kuri”.
-- **Memória:** SQLite (histórico, fatos, resumos, tarefas).
+- **Memória:** SQLite (histórico, fatos, resumos, tarefas, **Kurês**, **identidade viva**).
 - **Conversa:** depois que você chama ela, a janela fica aberta um tempo — não precisa repetir o nome a cada frase.
+- **Kurês / identidade:** gírias e traços permanentes dela (não só humor de um turno).
 
 O que ainda **não** é verdade (de propósito, até o movimento certo):
 
-- Lip sync real (a boca ainda é procedural)
+- Entender fala com alta precisão (Whisper ainda erra; está no plano 1.5)
 - Visão da tela
-- Gírias persistentes dela (Kurês)
+- Memória de relação (nós dois) — próximo passo, 2.3
 - YouTube/Twitter ao vivo (Reddit sim; o resto ela admite que não sabe)
 - Controle remoto do PC — **fora do norte**
 
@@ -74,7 +75,7 @@ SLEEP_TIMEOUT_MINUTES=5
 python kuri_desktop.py
 ```
 
-`python main.py` ainda abre o CLI antigo. O alvo é um único core (`kuri_core.py`).  
+`python main.py` é o CLI: pensa e fala pelo mesmo `kuri_runtime.py` do widget.  
 `python app.py` foi aposentado (era FastAPI + HeyGen).
 
 ### Executável
@@ -86,14 +87,14 @@ python kuri_desktop.py
 
 Quatro movimentos, nesta ordem. Detalhe e checklists no roadmap.
 
-1. **Fechar o corpo** — widget age de verdade, ela fica na conversa, lip sync, um loop só
-2. **Fazer ela ser ela** — Kurês, identidade viva, memória de relação, proatividade contextual
+1. **Fechar o corpo** — em grande parte feito (widget age, conversa, lip sync no áudio, um runtime). Falta voz melhor (1.5) e alguns detalhes de presença.
+2. **Fazer ela ser ela** — Kurês e identidade viva **feitos**. Próximo: memória de relação (2.3).
 3. **Mãos no teu mundo** — visão da tela, poucas skills profundas, Ollama com tools
 4. **Evolução visível** — skin/voz nova de vez em quando; ela comenta o próprio upgrade
 
 **Não está no plano:** remote, 2FA, ngrok, packs, Telos.
 
-Próximos 14 dias: ela executa skill no widget, conversa duas falas sem ouvir o nome, e o repo não se vende como Jarvis.
+**Agora:** Movimento 2.3 (memória de *vocês dois*). Reconhecimento de voz (1.5) fica na fila, sem furar a ordem.
 
 ---
 

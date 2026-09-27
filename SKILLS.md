@@ -1,7 +1,7 @@
 # 📜 Kuri IA — Lista Completa de Skills (Ferramentas)
 
 **Total de Skills:** 28  
-**Data da geração:** 2026-06-24  
+**Data da geração:** 2026-08-26  
 **Como usar:** A Kuri ativa essas skills automaticamente quando você pede algo que combina com a descrição. Você também pode pedir explicitamente ("Kuri, use a skill diagnosticar_sistema").
 
 As skills são carregadas dinamicamente da pasta `kuri_skills/`. Você pode recarregar com a skill `recarregar_skills`.
@@ -224,4 +224,4 @@ A Kuri possui um **modo sono / suspenso** para reduzir drasticamente o consumo d
 
 ---
 
-*Lista gerada dinamicamente com base no sistema atual (24 skills + comportamentos do sistema).*
+*Lista alinhada ao sistema atual (28 skills + comportamentos do sistema).*
